@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { supabase } from '../../supabase';
 import { User } from '../../types';
 
 interface LoginProps {
@@ -7,41 +8,30 @@ interface LoginProps {
   onLogin: (user: User) => void;
 }
 
-const Login: React.FC<LoginProps> = ({ onSwitch, onLogin }) => {
+const Login: React.FC<LoginProps> = ({ onSwitch }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.includes('@')) {
-      setError('Por favor, insira um e-mail válido.');
-      return;
-    }
-    if (password.length < 4) {
-      setError('Senha deve ter no mínimo 4 caracteres.');
-      return;
-    }
+    setError('');
+    setLoading(true);
 
-    // Mock Login Logic
-    // Adding status, totalInvested, and totalWithdrawn to fix TypeScript errors
-    const mockUser: User = {
-      id: '1',
-      name: 'Usuário Demo',
-      email: email,
-      phone: '11999999999',
-      referralCode: 'REF123',
-      referredBy: 'Não informado',
-      balance: 0.00,
-      joinDate: Date.now(),
-      checkInStreak: 0,
-      isFirstLogin: true,
-      role: 'USER',
-      status: 'ACTIVE',
-      totalInvested: 0,
-      totalWithdrawn: 0
-    };
-    onLogin(mockUser);
+    try {
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (authError) throw authError;
+      // O App.tsx cuidará de detectar a mudança de sessão e carregar o perfil
+    } catch (err: any) {
+      setError(err.message || 'Erro ao entrar. Verifique suas credenciais.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -78,13 +68,14 @@ const Login: React.FC<LoginProps> = ({ onSwitch, onLogin }) => {
           />
         </div>
 
-        {error && <p className="text-red-500 text-xs italic">{error}</p>}
+        {error && <p className="text-red-500 text-xs italic bg-red-50 p-2 rounded-lg">{error}</p>}
 
         <button
           type="submit"
-          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-4 rounded-xl shadow-lg shadow-emerald-200 transition-all transform active:scale-95"
+          disabled={loading}
+          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-4 rounded-xl shadow-lg shadow-emerald-200 transition-all transform active:scale-95 disabled:opacity-50"
         >
-          Entrar
+          {loading ? 'Entrando...' : 'Entrar'}
         </button>
       </form>
 

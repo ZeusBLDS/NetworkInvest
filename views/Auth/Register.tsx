@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { supabase } from '../../supabase';
 import { User } from '../../types';
 import { APP_CONFIG } from '../../constants';
 
@@ -8,7 +9,7 @@ interface RegisterProps {
   onRegister: (user: User) => void;
 }
 
-const Register: React.FC<RegisterProps> = ({ onSwitch, onRegister }) => {
+const Register: React.FC<RegisterProps> = ({ onSwitch }) => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -18,9 +19,12 @@ const Register: React.FC<RegisterProps> = ({ onSwitch, onRegister }) => {
     terms: false
   });
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+
     if (!/^[a-zA-Z\s]*$/.test(formData.name)) {
       setError('Nome completo deve conter apenas letras.');
       return;
@@ -34,25 +38,41 @@ const Register: React.FC<RegisterProps> = ({ onSwitch, onRegister }) => {
       return;
     }
 
-    // Adding status, totalInvested, and totalWithdrawn to fix TypeScript errors
-    const newUser: User = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: formData.name,
-      email: formData.email,
-      phone: formData.phone,
-      cpf: formData.cpf,
-      referralCode: 'REF' + Math.floor(Math.random() * 10000),
-      referredBy: APP_CONFIG.DEFAULT_REFERRER,
-      balance: 0.00,
-      joinDate: Date.now(),
-      checkInStreak: 0,
-      isFirstLogin: true,
-      role: 'USER',
-      status: 'ACTIVE',
-      totalInvested: 0,
-      totalWithdrawn: 0
-    };
-    onRegister(newUser);
+    setLoading(true);
+
+    try {
+      // 1. Criar usuário no Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+      });
+
+      if (authError) throw authError;
+
+      if (authData.user) {
+        // 2. Criar perfil na tabela 'profiles'
+        const { error: profileError } = await supabase.from('profiles').insert({
+          id: authData.user.id,
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          cpf: formData.cpf,
+          referral_code: 'REF' + Math.floor(Math.random() * 10000),
+          referred_by: APP_CONFIG.DEFAULT_REFERRER,
+          balance: 0.00,
+          active_plan_id: 'vip0',
+          role: 'USER',
+          status: 'ACTIVE'
+        });
+
+        if (profileError) throw profileError;
+        // O App.tsx detectará o novo usuário logado
+      }
+    } catch (err: any) {
+      setError(err.message || 'Erro ao criar conta. Tente outro e-mail.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -63,21 +83,11 @@ const Register: React.FC<RegisterProps> = ({ onSwitch, onRegister }) => {
           Voltar para login
         </button>
         <p className="text-sm text-gray-500 font-medium bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
-          Esta nova versão é uma fundação mobile sólida e limpa. Cadastre-se para acessar o marketplace de investimentos internos.
+          Cadastre-se para acessar o marketplace de investimentos internos.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4 pb-12">
-        <div className="space-y-1">
-          <label className="text-xs font-semibold text-gray-500 uppercase px-1">Quem convidou</label>
-          <input
-            type="text"
-            disabled
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-100 text-gray-500 cursor-not-allowed"
-            value={APP_CONFIG.DEFAULT_REFERRER}
-          />
-        </div>
-
         <div className="space-y-1">
           <label className="text-xs font-semibold text-gray-500 uppercase px-1">Nome completo</label>
           <input
@@ -102,7 +112,7 @@ const Register: React.FC<RegisterProps> = ({ onSwitch, onRegister }) => {
             />
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-gray-500 uppercase px-1">Telefone (DDD)</label>
+            <label className="text-xs font-semibold text-gray-500 uppercase px-1">Telefone</label>
             <input
               type="tel"
               required
@@ -138,16 +148,9 @@ const Register: React.FC<RegisterProps> = ({ onSwitch, onRegister }) => {
           />
         </div>
 
-        <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 text-[10px] leading-relaxed text-emerald-800">
-          <p className="font-bold mb-1 uppercase tracking-wider">Termos e Condições</p>
-          <p>A presente plataforma não constitui uma plataforma de investimentos regulamentada. Trata-se de um grupo que opera em mercados de trade e criptomoedas.</p>
-          <p className="mt-2 font-bold uppercase tracking-wider text-red-600">Avisos Importantes:</p>
-          <ul className="list-disc pl-3">
-            <li>Toda operação financeira envolve riscos.</li>
-            <li>Não há garantia de retorno ou preservação do capital.</li>
-            <li>O participante pode perder todo o valor investido.</li>
-          </ul>
-          <p className="mt-2">Ao prosseguir com o cadastro, você declara que leu, compreendeu e aceitou integralmente estes termos.</p>
+        <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 text-[10px] text-emerald-800">
+          <p className="font-bold mb-1 uppercase tracking-wider">Avisos Importantes:</p>
+          <p>Toda operação financeira envolve riscos. Não há garantia de retorno ou preservação do capital.</p>
         </div>
 
         <label className="flex items-start space-x-3 cursor-pointer">
@@ -160,13 +163,14 @@ const Register: React.FC<RegisterProps> = ({ onSwitch, onRegister }) => {
           <span className="text-xs text-gray-600 font-medium">Li e aceito os termos e condições acima</span>
         </label>
 
-        {error && <p className="text-red-500 text-xs italic bg-red-50 p-2 rounded-lg border border-red-100">{error}</p>}
+        {error && <p className="text-red-500 text-xs italic bg-red-50 p-2 rounded-lg">{error}</p>}
 
         <button
           type="submit"
-          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-xl shadow-lg transition-all"
+          disabled={loading}
+          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-xl shadow-lg transition-all disabled:opacity-50"
         >
-          Criar minha conta
+          {loading ? 'Criando conta...' : 'Criar minha conta'}
         </button>
       </form>
     </div>

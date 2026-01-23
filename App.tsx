@@ -36,7 +36,6 @@ const App: React.FC = () => {
   const [showWheel, setShowWheel] = useState(false);
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
 
-  // Initialize Auth session
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) fetchUserProfile(session.user.id);
@@ -90,7 +89,8 @@ const App: React.FC = () => {
     const id = userId || currentUser?.id;
     if (!id) return;
 
-    const { data, error } = await supabase.rpc('increment_balance', { 
+    // Nota: Requer a função RPC 'increment_balance' criada no Supabase SQL
+    const { error } = await supabase.rpc('increment_balance', { 
       user_id: id, 
       amount_to_add: amount 
     });
@@ -98,10 +98,35 @@ const App: React.FC = () => {
     if (!error) fetchUserProfile(id);
   };
 
-  // Deposit/Withdrawal Creation (Database Real)
+  const approveDeposit = async (requestId: string) => {
+    const req = deposits.find(r => r.id === requestId);
+    if (!req) return;
+
+    // 1. Atualizar status do depósito
+    await supabase.from('deposits').update({ status: 'APPROVED' }).eq('id', requestId);
+    
+    // 2. Atualizar saldo e plano do usuário
+    const userToUpdate = allUsers.find(u => u.id === req.userId);
+    if (userToUpdate) {
+      const updates = {
+        balance: userToUpdate.balance + (req.planId ? 0 : req.amount),
+        active_plan_id: req.planId || userToUpdate.activePlanId,
+        total_invested: (userToUpdate.totalInvested || 0) + req.amount
+      };
+      await supabase.from('profiles').update(updates).eq('id', req.userId);
+    }
+    
+    fetchAdminData();
+  };
+
+  const approveWithdraw = async (requestId: string) => {
+    await supabase.from('withdrawals').update({ status: 'APPROVED' }).eq('id', requestId);
+    fetchAdminData();
+  };
+
   const createDepositRequest = async (hash: string, amount: number, planId?: string) => {
     if (!currentUser) return;
-    const { error } = await supabase.from('deposits').insert({
+    await supabase.from('deposits').insert({
       user_id: currentUser.id,
       user_name: currentUser.name,
       amount,
@@ -109,7 +134,8 @@ const App: React.FC = () => {
       plan_id: planId,
       status: 'PENDING'
     });
-    if (!error && currentUser.role === 'ADMIN') fetchAdminData();
+    if (currentUser.role === 'ADMIN') fetchAdminData();
+    alert('Pedido enviado! Aguarde aprovação do administrador.');
   };
 
   const createWithdrawRequest = async (amount: number, wallet: string) => {
@@ -125,14 +151,15 @@ const App: React.FC = () => {
     if (!error) {
       await updateBalance(-amount);
       if (currentUser.role === 'ADMIN') fetchAdminData();
+      alert('Pedido de saque enviado!');
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-emerald-900 text-white">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-emerald-900 text-white">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white mb-4"></div>
-        <p className="ml-4 font-bold tracking-widest animate-pulse">CARREGANDO...</p>
+        <p className="font-bold tracking-widest animate-pulse">NETWORK INVEST</p>
       </div>
     );
   }
@@ -157,14 +184,19 @@ const App: React.FC = () => {
         return <PlanList 
           user={currentUser} 
           onActivate={(planId) => {
-            if (planId === 'vip0') {} // Handle VIP0 activation logic
+            if (planId === 'vip0') {} // Lógica de VIP0 Automático
             else { setPendingPlanId(planId); setShowDeposit(true); }
           }} 
         />;
       case AppView.NETWORK:
         return <NetworkView user={currentUser} />;
       case AppView.ACCOUNT:
-        return <Account user={currentUser} onLogout={handleLogout} notifications={notifications} onUpdateUser={() => {}} />;
+        return <Account 
+          user={currentUser} 
+          onLogout={handleLogout} 
+          notifications={notifications} 
+          onUpdateUser={async (u) => { await supabase.from('profiles').update(u).eq('id', u.id); fetchUserProfile(u.id); }} 
+        />;
       case AppView.ADMIN:
         return (
           <AdminPanel 
@@ -172,14 +204,19 @@ const App: React.FC = () => {
             deposits={deposits}
             withdrawals={withdrawals}
             onClose={() => setCurrentView(AppView.ACCOUNT)} 
-            onApproveDeposit={() => {}}
-            onRejectDeposit={() => {}}
-            onApproveWithdraw={() => {}}
-            onRejectWithdraw={() => {}}
-            onUpdateStatus={() => {}}
-            onDeleteUser={() => {}}
-            onGivePlan={() => {}}
-            onAdjustBalance={() => {}}
+            onApproveDeposit={approveDeposit}
+            onRejectDeposit={async (id) => { await supabase.from('deposits').update({ status: 'REJECTED' }).eq('id', id); fetchAdminData(); }}
+            onApproveWithdraw={approveWithdraw}
+            onRejectWithdraw={async (id) => { 
+              const req = withdrawals.find(w => w.id === id);
+              if(req) await updateBalance(req.amount, req.userId); // Reembolsar
+              await supabase.from('withdrawals').update({ status: 'REJECTED' }).eq('id', id); 
+              fetchAdminData(); 
+            }}
+            onUpdateStatus={async (id, s) => { await supabase.from('profiles').update({ status: s }).eq('id', id); fetchAdminData(); }}
+            onDeleteUser={async (id) => { await supabase.from('profiles').delete().eq('id', id); fetchAdminData(); }}
+            onGivePlan={async (id, p) => { await supabase.from('profiles').update({ active_plan_id: p }).eq('id', id); fetchAdminData(); }}
+            onAdjustBalance={async (id, a) => { await updateBalance(a, id); fetchAdminData(); }}
           />
         );
       default:
@@ -198,12 +235,12 @@ const App: React.FC = () => {
       )}
 
       {showWelcome && <WelcomeModal onClose={() => setShowWelcome(false)} />}
-      {showVipZero && <VipZeroModal onActivate={() => {}} />}
+      {showVipZero && <VipZeroModal onActivate={() => setShowVipZero(false)} />}
       {showWithdraw && currentUser && (
         <WithdrawModal 
           user={currentUser} 
           onClose={() => setShowWithdraw(false)} 
-          onSubmit={createWithdrawRequest}
+          onSubmit={(amt) => createWithdrawRequest(amt, currentUser.walletAddress || '')}
         />
       )}
       {showDeposit && (
