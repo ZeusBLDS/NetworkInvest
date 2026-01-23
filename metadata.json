@@ -1,0 +1,7 @@
+{
+  "name": "Network Invest Global Market",
+  "description": "Uma plataforma moderna de marketplace de investimentos em USDT com rendimentos diários, sistema de indicação multinível e gamificação de check-in diário.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
