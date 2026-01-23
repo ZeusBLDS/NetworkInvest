@@ -41,7 +41,6 @@ const Register: React.FC<RegisterProps> = ({ onSwitch }) => {
     setLoading(true);
 
     try {
-      // Cadastrar no Auth enviando dados extras como metadados
       const { data, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -50,19 +49,26 @@ const Register: React.FC<RegisterProps> = ({ onSwitch }) => {
             name: formData.name,
             phone: formData.phone,
             cpf: formData.cpf,
-            referred_by: APP_CONFIG.DEFAULT_REFERRER
+            referred_by: APP_CONFIG.DEFAULT_REFERRER,
+            is_first_login: true,
+            active_plan_id: 'vip0'
           }
         }
       });
 
-      if (authError) throw authError;
+      if (authError) {
+        if (authError.message.includes('rate limit')) {
+          throw new Error('Limite de cadastros atingido por agora. Por favor, aguarde 10 minutos ou tente outra rede.');
+        }
+        throw authError;
+      }
 
       if (data.user) {
-        alert('Conta criada com sucesso! Faça login para continuar.');
-        onSwitch(); // Volta para a tela de login
+        alert('Conta criada com sucesso! Você já pode entrar.');
+        onSwitch();
       }
     } catch (err: any) {
-      setError(err.message || 'Erro ao criar conta. Verifique os dados ou tente outro e-mail.');
+      setError(err.message || 'Erro ao criar conta. Verifique os dados.');
     } finally {
       setLoading(false);
     }
@@ -163,8 +169,8 @@ const Register: React.FC<RegisterProps> = ({ onSwitch }) => {
         </label>
 
         {error && (
-          <div className="bg-red-50 border border-red-100 p-3 rounded-xl">
-            <p className="text-red-500 text-xs font-bold">{error}</p>
+          <div className="bg-red-50 border border-red-200 p-4 rounded-2xl animate-pulse">
+            <p className="text-red-600 text-xs font-bold text-center leading-tight">{error}</p>
           </div>
         )}
 
