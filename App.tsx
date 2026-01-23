@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppView, User, Notification, DepositRequest, WithdrawRequest } from './types';
 import { PLANS } from './constants';
 import { supabase } from './supabase';
@@ -62,9 +62,20 @@ const App: React.FC = () => {
       .single();
 
     if (data) {
-      setCurrentUser(data as any);
-      if (data.role === 'ADMIN') fetchAdminData();
+      const user = data as any;
+      setCurrentUser(user);
+      
+      // Lógica de Primeiro Login / VIP 0
+      if (user.is_first_login) {
+        setShowWelcome(true);
+        setShowVipZero(true);
+        // Desativar flag de primeiro login no banco
+        await supabase.from('profiles').update({ is_first_login: false }).eq('id', userId);
+      }
+
+      if (user.role === 'ADMIN') fetchAdminData();
       setLoading(false);
+      setCurrentView(AppView.HOME);
     } else {
       setLoading(false);
     }
@@ -89,7 +100,6 @@ const App: React.FC = () => {
     const id = userId || currentUser?.id;
     if (!id) return;
 
-    // Nota: Requer a função RPC 'increment_balance' criada no Supabase SQL
     const { error } = await supabase.rpc('increment_balance', { 
       user_id: id, 
       amount_to_add: amount 
@@ -102,10 +112,8 @@ const App: React.FC = () => {
     const req = deposits.find(r => r.id === requestId);
     if (!req) return;
 
-    // 1. Atualizar status do depósito
     await supabase.from('deposits').update({ status: 'APPROVED' }).eq('id', requestId);
     
-    // 2. Atualizar saldo e plano do usuário
     const userToUpdate = allUsers.find(u => u.id === req.userId);
     if (userToUpdate) {
       const updates = {
@@ -184,8 +192,12 @@ const App: React.FC = () => {
         return <PlanList 
           user={currentUser} 
           onActivate={(planId) => {
-            if (planId === 'vip0') {} // Lógica de VIP0 Automático
-            else { setPendingPlanId(planId); setShowDeposit(true); }
+            if (planId === 'vip0') {
+               alert('Você já possui o plano VIP 0 ativo!');
+            } else { 
+               setPendingPlanId(planId); 
+               setShowDeposit(true); 
+            }
           }} 
         />;
       case AppView.NETWORK:
