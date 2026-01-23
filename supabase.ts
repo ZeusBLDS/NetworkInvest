@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 
 // URL e Chave Pública do seu projeto Supabase
