@@ -7,7 +7,7 @@ interface NetworkProps {
 }
 
 const NetworkView: React.FC<NetworkProps> = ({ user }) => {
-  // Garantir que o link use o domínio atual e a rota correta
+  // Ajuste do Link de Convite
   const baseUrl = window.location.origin;
   const referralLink = `${baseUrl}/?ref=${user.referralCode}`;
 

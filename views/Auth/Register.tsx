@@ -32,45 +32,34 @@ const Register: React.FC<RegisterProps> = ({ onSwitch }) => {
     }
   }, []);
 
-  // Função para aplicar máscara de CPF: 000.000.000-00
   const maskCPF = (value: string) => {
     return value
-      .replace(/\D/g, '') // Remove tudo o que não é dígito
-      .replace(/(\d{3})(\d)/, '$1.$2') // Coloca um ponto depois dos 3 primeiros dígitos
-      .replace(/(\d{3})(\d)/, '$1.$2') // Coloca um ponto depois dos 6 primeiros dígitos
-      .replace(/(\d{3})(\d{1,2})$/, '$1-$2') // Coloca um hífen antes dos 2 últimos dígitos
-      .slice(0, 14); // Limita o tamanho final
+      .replace(/\D/g, '')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
+      .slice(0, 14);
   };
 
-  // Função para aplicar máscara de Telefone: (00) 00000-0000
   const maskPhone = (value: string) => {
     return value
-      .replace(/\D/g, '') // Remove tudo o que não é dígito
-      .replace(/(\d{2})(\d)/, '($1) $2') // Coloca parênteses no DDD
-      .replace(/(\d{5})(\d)/, '$1-$2') // Coloca hífen após o 5º dígito (padrão celular)
-      .replace(/(-\d{4})\d+?$/, '$1') // Limita em 11 dígitos totais
-      .slice(0, 15); // Limita o tamanho final
+      .replace(/\D/g, '')
+      .replace(/(\d{2})(\d)/, '($1) $2')
+      .replace(/(\d{5})(\d)/, '$1-$2')
+      .slice(0, 15);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Validação de nome
-    if (!/^[a-zA-ZÀ-ÿ\s]*$/.test(formData.name)) {
-      setError('Nome completo deve conter apenas letras.');
-      return;
-    }
-
-    // Validação de senha
     if (formData.password.length < 4) {
-      setError('Senha deve ter no mínimo 4 caracteres.');
+      setError('A senha deve ter pelo menos 4 caracteres.');
       return;
     }
 
-    // Termos de uso
     if (!formData.terms) {
-      setError('Você deve aceitar os termos e condições.');
+      setError('Você precisa aceitar os termos.');
       return;
     }
 
@@ -83,8 +72,8 @@ const Register: React.FC<RegisterProps> = ({ onSwitch }) => {
         options: {
           data: {
             name: formData.name,
-            phone: formData.phone.replace(/\D/g, ''), // Salva limpo no banco
-            cpf: formData.cpf.replace(/\D/g, ''), // Salva limpo no banco
+            phone: formData.phone.replace(/\D/g, ''),
+            cpf: formData.cpf.replace(/\D/g, ''),
             referred_by: referredBy,
           }
         }
@@ -93,16 +82,11 @@ const Register: React.FC<RegisterProps> = ({ onSwitch }) => {
       if (authError) throw authError;
 
       if (data.user) {
-        alert('Cadastro realizado com sucesso! Use seu e-mail e senha para entrar.');
+        alert('Conta criada! Faça login para continuar.');
         onSwitch();
       }
     } catch (err: any) {
-      console.error("Erro no cadastro:", err);
-      if (err.message.includes('Database error')) {
-        setError('Erro no banco de dados. Certifique-se de que o sistema está online.');
-      } else {
-        setError(err.message || 'Erro ao criar conta. Verifique os dados.');
-      }
+      setError(err.message || 'Erro ao criar conta.');
     } finally {
       setLoading(false);
     }
@@ -113,36 +97,39 @@ const Register: React.FC<RegisterProps> = ({ onSwitch }) => {
       <div className="mb-6 pt-4">
         <button onClick={onSwitch} className="text-gray-400 hover:text-gray-600 mb-4 flex items-center text-xs font-bold uppercase tracking-widest">
           <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
-          Voltar para login
+          Fazer Login
         </button>
         <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-           <h2 className="text-xl font-black text-emerald-800 mb-1 uppercase tracking-tight">Crie sua Conta</h2>
-           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Marketplace Network Invest</p>
+           <h2 className="text-xl font-black text-emerald-800 mb-1 uppercase tracking-tight">CRIAR CONTA</h2>
+           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Sistema Network Invest Global</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4 pb-12">
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-gray-400 uppercase px-1 tracking-widest">Quem convidou</label>
-          <div className="w-full px-5 py-4 rounded-2xl border border-emerald-100 bg-emerald-50 text-emerald-700 font-bold text-sm">
-            {referredBy}
-          </div>
+          <label className="text-[10px] font-black text-gray-400 uppercase px-1 tracking-widest">Convidado por</label>
+          <input
+            type="text"
+            readOnly
+            className="w-full px-5 py-4 rounded-2xl border border-emerald-100 bg-emerald-50 text-emerald-700 font-black text-sm outline-none"
+            value={referredBy}
+          />
         </div>
 
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-gray-400 uppercase px-1 tracking-widest">Nome completo</label>
+          <label className="text-[10px] font-black text-gray-400 uppercase px-1 tracking-widest">Nome Completo</label>
           <input
             type="text"
             required
             className="w-full px-5 py-4 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 outline-none bg-white transition-all text-sm font-medium"
-            placeholder="Seu nome completo"
+            placeholder="Nome Sobrenome"
             value={formData.name}
             onChange={(e) => setFormData({...formData, name: e.target.value})}
           />
         </div>
 
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-gray-400 uppercase px-1 tracking-widest">CPF (Apenas números)</label>
+          <label className="text-[10px] font-black text-gray-400 uppercase px-1 tracking-widest">CPF</label>
           <input
             type="text"
             required
@@ -154,7 +141,7 @@ const Register: React.FC<RegisterProps> = ({ onSwitch }) => {
         </div>
 
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-gray-400 uppercase px-1 tracking-widest">WhatsApp / Telefone</label>
+          <label className="text-[10px] font-black text-gray-400 uppercase px-1 tracking-widest">WhatsApp</label>
           <input
             type="tel"
             required
@@ -166,35 +153,27 @@ const Register: React.FC<RegisterProps> = ({ onSwitch }) => {
         </div>
 
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-gray-400 uppercase px-1 tracking-widest">Email Principal</label>
+          <label className="text-[10px] font-black text-gray-400 uppercase px-1 tracking-widest">Email</label>
           <input
             type="email"
             required
             className="w-full px-5 py-4 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 outline-none bg-white text-sm"
-            placeholder="exemplo@gmail.com"
+            placeholder="seu@email.com"
             value={formData.email}
             onChange={(e) => setFormData({...formData, email: e.target.value})}
           />
         </div>
 
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-gray-400 uppercase px-1 tracking-widest">Senha de Acesso</label>
+          <label className="text-[10px] font-black text-gray-400 uppercase px-1 tracking-widest">Criar Senha</label>
           <input
             type="password"
             required
             className="w-full px-5 py-4 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 outline-none bg-white text-sm"
-            placeholder="Mínimo 4 caracteres"
+            placeholder="Mín. 4 caracteres"
             value={formData.password}
             onChange={(e) => setFormData({...formData, password: e.target.value})}
           />
-        </div>
-
-        <div className="p-5 bg-emerald-50 rounded-3xl border border-emerald-100 space-y-2">
-          <p className="text-[10px] font-black text-emerald-800 uppercase tracking-widest">Termos de Uso:</p>
-          <p className="text-[9px] text-emerald-700 leading-relaxed font-medium">
-            Ao se cadastrar, você declara ser maior de idade e estar ciente de que investimentos no mercado global possuem riscos. 
-            A Network Invest é um marketplace intermediador.
-          </p>
         </div>
 
         <label className="flex items-start space-x-3 cursor-pointer p-2 group">
@@ -204,14 +183,14 @@ const Register: React.FC<RegisterProps> = ({ onSwitch }) => {
             checked={formData.terms}
             onChange={(e) => setFormData({...formData, terms: e.target.checked})}
           />
-          <span className="text-[11px] text-gray-500 font-bold leading-tight group-hover:text-gray-700 transition-colors">
-            Li e concordo com os termos de participação.
+          <span className="text-[11px] text-gray-500 font-bold leading-tight uppercase tracking-tighter">
+            Aceito os termos e riscos de mercado.
           </span>
         </label>
 
         {error && (
           <div className="bg-red-50 border border-red-200 p-4 rounded-2xl">
-            <p className="text-red-600 text-[10px] font-black text-center leading-tight uppercase tracking-widest">{error}</p>
+            <p className="text-red-600 text-[10px] font-black text-center uppercase">{error}</p>
           </div>
         )}
 
@@ -220,7 +199,7 @@ const Register: React.FC<RegisterProps> = ({ onSwitch }) => {
           disabled={loading}
           className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-5 rounded-3xl shadow-xl shadow-emerald-100 transition-all transform active:scale-95 disabled:opacity-50 uppercase tracking-widest text-sm"
         >
-          {loading ? 'CRIANDO CONTA...' : 'FINALIZAR CADASTRO'}
+          {loading ? 'CADASTRANDO...' : 'CRIAR CONTA AGORA'}
         </button>
       </form>
     </div>
