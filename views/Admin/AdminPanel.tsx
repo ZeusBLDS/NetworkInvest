@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, DepositRequest, WithdrawRequest, Plan } from '../../types';
 import { PLANS, APP_CONFIG } from '../../constants';
 
@@ -26,6 +26,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [activeTab, setActiveTab] = useState<'DASH' | 'USERS' | 'FINANCE' | 'PLANS'>('DASH');
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Debug local para confirmar que os dados chegaram
+  useEffect(() => {
+    console.log("Admin Panel Data Updated:", { usersCount: users.length, depositsCount: deposits.length });
+  }, [users, deposits]);
+
   // Stats calculation
   const totalInvested = users.reduce((sum, u) => sum + (u.totalInvested || 0), 0);
   const totalPaid = withdrawals.filter(w => w.status === 'APPROVED').reduce((sum, w) => sum + w.amount, 0);
@@ -33,8 +38,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const activeVips = users.filter(u => u.activePlanId && u.activePlanId !== 'vip0').length;
 
   const filteredUsers = users.filter(u => 
-    u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    u.email.toLowerCase().includes(searchTerm.toLowerCase())
+    (u.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
+    (u.email?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
 
   const getPlanName = (planId: string | undefined) => {
@@ -91,46 +96,50 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       </div>
 
       <div className="space-y-3">
-        {filteredUsers.map(user => (
-          <div key={user.id} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-            <div className="flex justify-between items-start mb-3">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center font-bold text-gray-400 uppercase text-xs">
-                  {user.name.charAt(0)}
+        {filteredUsers.length === 0 ? (
+          <p className="text-center text-gray-400 py-10">Nenhum usuário encontrado.</p>
+        ) : (
+          filteredUsers.map(user => (
+            <div key={user.id} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+              <div className="flex justify-between items-start mb-3">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center font-bold text-gray-400 uppercase text-xs">
+                    {(user.name || 'U').charAt(0)}
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-900 text-sm">{user.name}</p>
+                    <p className="text-[10px] text-gray-400">{user.email}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-bold text-gray-900 text-sm">{user.name}</p>
-                  <p className="text-[10px] text-gray-400">{user.email}</p>
+                <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border ${user.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
+                  {user.status || 'ACTIVE'}
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <div className="bg-gray-50 p-2 rounded-xl text-center">
+                  <p className="text-[10px] font-black text-gray-800">{(user.balance || 0).toFixed(2)}</p>
+                  <p className="text-[8px] text-gray-400 uppercase">Saldo</p>
+                </div>
+                <div className="bg-gray-50 p-2 rounded-xl text-center">
+                  <p className="text-[10px] font-black text-emerald-600">{getPlanName(user.activePlanId)}</p>
+                  <p className="text-[8px] text-gray-400 uppercase">Plano</p>
+                </div>
+                <div className="bg-gray-50 p-2 rounded-xl text-center">
+                  <p className="text-[10px] font-black text-gray-800">{(user.totalInvested || 0).toFixed(0)}</p>
+                  <p className="text-[8px] text-gray-400 uppercase">Inv.</p>
                 </div>
               </div>
-              <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border ${user.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
-                {user.status || 'ACTIVE'}
-              </span>
-            </div>
-            
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              <div className="bg-gray-50 p-2 rounded-xl text-center">
-                <p className="text-[10px] font-black text-gray-800">{user.balance.toFixed(2)}</p>
-                <p className="text-[8px] text-gray-400 uppercase">Saldo</p>
-              </div>
-              <div className="bg-gray-50 p-2 rounded-xl text-center">
-                <p className="text-[10px] font-black text-emerald-600">{getPlanName(user.activePlanId)}</p>
-                <p className="text-[8px] text-gray-400 uppercase">Plano</p>
-              </div>
-              <div className="bg-gray-50 p-2 rounded-xl text-center">
-                <p className="text-[10px] font-black text-gray-800">{(user.totalInvested || 0).toFixed(0)}</p>
-                <p className="text-[8px] text-gray-400 uppercase">Inv.</p>
-              </div>
-            </div>
 
-            <div className="flex flex-wrap gap-2">
-              <button onClick={() => onUpdateStatus(user.id, user.status === 'ACTIVE' ? 'BLOCKED' : 'ACTIVE')} className="flex-1 bg-gray-900 text-white text-[9px] font-bold py-2 rounded-lg">BLOQUEAR</button>
-              <button onClick={() => { const val = prompt('Ajuste de Saldo (ex: 10):'); if(val) onAdjustBalance(user.id, parseFloat(val)); }} className="flex-1 bg-emerald-100 text-emerald-700 text-[9px] font-bold py-2 rounded-lg">AJUSTAR SALDO</button>
-              <button onClick={() => { const p = prompt('ID do Plano (vip1, vip2, vip3, vip4):'); if(p) onGivePlan(user.id, p); }} className="flex-1 bg-blue-100 text-blue-700 text-[9px] font-bold py-2 rounded-lg">DAR PLANO</button>
-              <button onClick={() => confirm('Excluir usuário?') && onDeleteUser(user.id)} className="bg-red-50 text-red-600 p-2 rounded-lg border border-red-100"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => onUpdateStatus(user.id, user.status === 'ACTIVE' ? 'BLOCKED' : 'ACTIVE')} className="flex-1 bg-gray-900 text-white text-[9px] font-bold py-2 rounded-lg">BLOQUEAR</button>
+                <button onClick={() => { const val = prompt('Ajuste de Saldo (ex: 10):'); if(val) onAdjustBalance(user.id, parseFloat(val)); }} className="flex-1 bg-emerald-100 text-emerald-700 text-[9px] font-bold py-2 rounded-lg">AJUSTAR SALDO</button>
+                <button onClick={() => { const p = prompt('ID do Plano (vip1, vip2, vip3, vip4):'); if(p) onGivePlan(user.id, p); }} className="flex-1 bg-blue-100 text-blue-700 text-[9px] font-bold py-2 rounded-lg">DAR PLANO</button>
+                <button onClick={() => onDeleteUser(user.id)} className="bg-red-50 text-red-600 p-2 rounded-lg border border-red-100"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );
