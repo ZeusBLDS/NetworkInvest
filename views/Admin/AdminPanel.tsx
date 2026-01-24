@@ -1,7 +1,6 @@
 
 import React, { useState } from 'react';
-import { User, DepositRequest, WithdrawRequest, Plan } from '../../types';
-import { PLANS, APP_CONFIG } from '../../constants';
+import { User, DepositRequest, WithdrawRequest } from '../../types';
 
 interface AdminPanelProps {
   users: User[];
@@ -26,276 +25,105 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [activeTab, setActiveTab] = useState<'DASH' | 'USERS' | 'FINANCE' | 'PLANS'>('DASH');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Stats calculation
   const totalInvested = users.reduce((sum, u) => sum + (u.totalInvested || 0), 0);
   const totalPaid = withdrawals.filter(w => w.status === 'APPROVED').reduce((sum, w) => sum + w.amount, 0);
-  const platformProfit = totalInvested - totalPaid;
-  const activeVips = users.filter(u => u.activePlanId && u.activePlanId !== 'vip0').length;
 
   const filteredUsers = users.filter(u => 
-    u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    u.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const renderDashboard = () => (
-    <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm">
-          <p className="text-3xl font-black text-emerald-600">{users.length}</p>
-          <p className="text-[10px] font-bold text-gray-400 uppercase">Usuários Totais</p>
-        </div>
-        <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm">
-          <p className="text-3xl font-black text-emerald-600">{activeVips}</p>
-          <p className="text-[10px] font-bold text-gray-400 uppercase">Vips Ativos</p>
-        </div>
-        <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm">
-          <p className="text-xl font-black text-emerald-600">{totalInvested.toFixed(2)}</p>
-          <p className="text-[10px] font-bold text-gray-400 uppercase">Total Investido (USDT)</p>
-        </div>
-        <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm">
-          <p className="text-xl font-black text-blue-600">{totalPaid.toFixed(2)}</p>
-          <p className="text-[10px] font-bold text-gray-400 uppercase">Total Pago (USDT)</p>
-        </div>
-      </div>
-
-      <div className="bg-emerald-950 rounded-3xl p-6 text-white shadow-xl">
-        <div className="flex justify-between items-center mb-1">
-          <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Lucro da Plataforma</p>
-          <span className="bg-emerald-500/20 text-emerald-300 text-[8px] px-2 py-0.5 rounded-full font-black border border-emerald-500/30 uppercase tracking-widest">Global Control</span>
-        </div>
-        <h3 className="text-4xl font-black">{platformProfit.toFixed(2)} <span className="text-lg font-medium opacity-50">USDT</span></h3>
-      </div>
-
-      <div className="space-y-3">
-        <h4 className="text-xs font-bold text-gray-400 uppercase px-1">Pendências Críticas</h4>
-        <button onClick={() => setActiveTab('FINANCE')} className="w-full bg-amber-50 rounded-2xl p-4 border border-amber-100 flex items-center justify-between active:scale-[0.98] transition-all">
-          <span className="text-sm font-bold text-amber-800">Depósitos Pendentes</span>
-          <span className="bg-amber-600 text-white px-3 py-1 rounded-full text-xs font-black">
-            {deposits.filter(d => d.status === 'PENDING').length}
-          </span>
-        </button>
-        <button onClick={() => setActiveTab('FINANCE')} className="w-full bg-red-50 rounded-2xl p-4 border border-red-100 flex items-center justify-between active:scale-[0.98] transition-all">
-          <span className="text-sm font-bold text-red-800">Saques Pendentes</span>
-          <span className="bg-red-600 text-white px-3 py-1 rounded-full text-xs font-black">
-            {withdrawals.filter(w => w.status === 'PENDING').length}
-          </span>
-        </button>
-      </div>
-    </div>
-  );
-
-  const renderUsers = () => (
-    <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-      <div className="space-y-3">
-        <h3 className="text-lg font-bold">Gestão de Usuários</h3>
-        <div className="relative">
-          <input 
-            type="text" 
-            placeholder="Buscar por nome ou email..." 
-            className="w-full pl-10 pr-4 py-3 bg-white rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-emerald-500 text-sm shadow-sm"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <svg className="w-4 h-4 absolute left-4 top-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        {filteredUsers.length === 0 ? (
-          <p className="text-center text-gray-400 py-10 text-sm">Nenhum usuário encontrado.</p>
-        ) : (
-          filteredUsers.map(user => (
-            <div key={user.id} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-              <div className="flex justify-between items-start mb-3">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center font-bold text-gray-400 uppercase text-xs">
-                    {user.name.charAt(0)}
-                  </div>
-                  <div>
-                    <p className="font-bold text-gray-900 text-sm">{user.name}</p>
-                    <p className="text-[10px] text-gray-400">{user.email}</p>
-                  </div>
-                </div>
-                <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border ${user.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
-                  {user.status || 'ACTIVE'}
-                </span>
-              </div>
-              
-              <div className="grid grid-cols-3 gap-2 mb-4">
-                <div className="bg-gray-50 p-2 rounded-xl text-center">
-                  <p className="text-[10px] font-black text-gray-800">{user.balance.toFixed(2)}</p>
-                  <p className="text-[8px] text-gray-400 uppercase">Saldo</p>
-                </div>
-                <div className="bg-gray-50 p-2 rounded-xl text-center">
-                  <p className="text-[10px] font-black text-gray-800">{user.activePlanId || 'Nenhum'}</p>
-                  <p className="text-[8px] text-gray-400 uppercase">Plano</p>
-                </div>
-                <div className="bg-gray-50 p-2 rounded-xl text-center">
-                  <p className="text-[10px] font-black text-gray-800">{(user.totalInvested || 0).toFixed(0)}</p>
-                  <p className="text-[8px] text-gray-400 uppercase">Inv.</p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <button 
-                  onClick={() => onUpdateStatus(user.id, user.status === 'ACTIVE' ? 'BLOCKED' : 'ACTIVE')}
-                  className="flex-1 bg-gray-900 text-white text-[9px] font-bold py-2 rounded-lg active:scale-95 transition-all"
-                >
-                  {user.status === 'ACTIVE' ? 'BLOQUEAR' : 'DESBLOQUEAR'}
-                </button>
-                <button 
-                  onClick={() => {
-                    const amount = prompt('Valor para adicionar/remover (ex: 10 ou -10):');
-                    if (amount) onAdjustBalance(user.id, parseFloat(amount));
-                  }}
-                  className="flex-1 bg-emerald-100 text-emerald-700 text-[9px] font-bold py-2 rounded-lg active:scale-95 transition-all"
-                >
-                  AJUSTAR SALDO
-                </button>
-                <button 
-                   onClick={() => {
-                     const plan = prompt('ID do Plano (vip1, vip2, vip3, vip4):');
-                     if (plan) onGivePlan(user.id, plan);
-                   }}
-                   className="flex-1 bg-blue-100 text-blue-700 text-[9px] font-bold py-2 rounded-lg active:scale-95 transition-all"
-                >
-                  DAR PLANO
-                </button>
-                <button 
-                  onClick={() => confirm('Excluir usuário permanentemente?') && onDeleteUser(user.id)}
-                  className="bg-red-50 text-red-600 p-2 rounded-lg active:scale-95 transition-all border border-red-100"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                </button>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-
-  const renderFinance = () => (
-    <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-      <section>
-        <h3 className="text-sm font-black text-gray-400 uppercase mb-3 px-1">Depósitos Pendentes</h3>
-        <div className="space-y-3">
-          {deposits.filter(d => d.status === 'PENDING').length === 0 && <p className="text-xs text-gray-400 text-center py-6 bg-white rounded-2xl border border-dashed border-gray-200">Nenhum pedido de depósito pendente</p>}
-          {deposits.filter(d => d.status === 'PENDING').map(req => (
-            <div key={req.id} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-              <div className="flex justify-between items-start mb-2">
-                <div>
-                  <p className="text-xs font-bold text-gray-900">{req.userName}</p>
-                  <p className="text-[10px] text-emerald-600 font-black">{req.amount.toFixed(2)} USDT {req.planId ? `(${req.planId})` : ''}</p>
-                </div>
-                <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                  {req.status}
-                </span>
-              </div>
-              <p className="text-[8px] font-mono text-gray-400 break-all mb-3 bg-gray-50 p-2 rounded-lg border border-gray-100 italic">Hash: {req.hash}</p>
-              <div className="flex gap-2">
-                <button onClick={() => onApproveDeposit(req.id)} className="flex-1 bg-emerald-600 text-white text-[10px] font-bold py-2.5 rounded-xl shadow-lg shadow-emerald-100 active:scale-95 transition-all">APROVAR</button>
-                <button onClick={() => onRejectDeposit(req.id)} className="flex-1 bg-gray-100 text-gray-500 text-[10px] font-bold py-2.5 rounded-xl active:scale-95 transition-all">REJEITAR</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section>
-        <h3 className="text-sm font-black text-gray-400 uppercase mb-3 px-1">Saques Pendentes</h3>
-        <div className="space-y-3">
-          {withdrawals.filter(w => w.status === 'PENDING').length === 0 && <p className="text-xs text-gray-400 text-center py-6 bg-white rounded-2xl border border-dashed border-gray-200">Nenhum pedido de saque pendente</p>}
-          {withdrawals.filter(w => w.status === 'PENDING').map(req => (
-            <div key={req.id} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-              <div className="flex justify-between items-start mb-2">
-                <div>
-                  <p className="text-xs font-bold text-gray-900">{req.userName}</p>
-                  <p className="text-[10px] text-red-600 font-black">{req.amount.toFixed(2)} USDT (Taxa: {req.fee.toFixed(2)})</p>
-                </div>
-                <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                  {req.status}
-                </span>
-              </div>
-              <p className="text-[8px] font-mono text-gray-400 break-all mb-3 bg-gray-50 p-2 rounded-lg border border-gray-100">Carteira: {req.wallet}</p>
-              <div className="flex gap-2">
-                <button onClick={() => onApproveWithdraw(req.id)} className="flex-1 bg-emerald-600 text-white text-[10px] font-bold py-2.5 rounded-xl shadow-lg shadow-emerald-100 active:scale-95 transition-all">MARCAR COMO PAGO</button>
-                <button onClick={() => onRejectWithdraw(req.id)} className="flex-1 bg-gray-100 text-gray-500 text-[10px] font-bold py-2.5 rounded-xl active:scale-95 transition-all">RECUSAR</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-    </div>
-  );
-
-  const renderPlans = () => (
-    <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-      <div className="flex items-center justify-between px-1">
-        <h3 className="text-lg font-bold">Gestão de Planos</h3>
-        <button className="bg-emerald-600 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-lg shadow-emerald-100 active:scale-95 transition-all">+ NOVO</button>
-      </div>
-      
-      <div className="grid grid-cols-1 gap-3">
-        {PLANS.map(plan => (
-          <div key={plan.id} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 font-bold text-xs uppercase italic">
-                {plan.id}
-              </div>
-              <div>
-                <p className="font-bold text-gray-900 text-sm">{plan.name}</p>
-                <p className="text-[10px] text-gray-400">{plan.dailyPercent}% / Dia • {plan.investment} USDT</p>
-              </div>
-            </div>
-            <button className="p-2 bg-gray-50 rounded-lg text-gray-400 active:scale-90 transition-all">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
+    (u.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
+    (u.email?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
-      <div className="p-6 bg-white border-b border-gray-100 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-        <div>
-          <h2 className="text-xl font-black text-gray-900 italic leading-none">ADMIN PANEL</h2>
-          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Network Global Control</p>
-        </div>
-        <button onClick={onClose} className="p-2 bg-gray-50 rounded-xl text-gray-400 active:rotate-90 transition-transform">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-        </button>
+      <div className="p-6 bg-white border-b border-gray-100 flex items-center justify-between sticky top-0 z-10">
+        <h2 className="text-xl font-black italic">ADMIN PANEL</h2>
+        <button onClick={onClose} className="p-2 bg-gray-50 rounded-xl text-gray-400"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
       </div>
 
-      <div className="flex p-4 gap-2 overflow-x-auto no-scrollbar bg-white border-b border-gray-100 sticky top-[73px] z-10">
-        {[
-          { id: 'DASH', label: 'Resumo', icon: '📊' },
-          { id: 'USERS', label: 'Usuários', icon: '👥' },
-          { id: 'FINANCE', label: 'Financeiro', icon: '💰' },
-          { id: 'PLANS', label: 'Planos', icon: '💼' }
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
-            className={`flex-none px-4 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all flex items-center space-x-2 border-2 ${
-              activeTab === tab.id 
-              ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-100' 
-              : 'bg-white text-gray-400 border-gray-50'
-            }`}
-          >
-            <span className="text-sm">{tab.icon}</span>
-            <span>{tab.label}</span>
-          </button>
+      <div className="flex p-4 gap-2 bg-white border-b border-gray-100 sticky top-[73px] z-10 overflow-x-auto no-scrollbar">
+        {['DASH', 'USERS', 'FINANCE', 'PLANS'].map((tab) => (
+          <button key={tab} onClick={() => setActiveTab(tab as any)} className={`flex-none px-4 py-2 rounded-xl text-[10px] font-black uppercase ${activeTab === tab ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-400'}`}>{tab === 'DASH' ? 'Resumo' : tab === 'USERS' ? 'Usuários' : tab === 'FINANCE' ? 'Financeiro' : 'Planos'}</button>
         ))}
       </div>
 
-      <div className="flex-1 p-6 pb-24">
-        {activeTab === 'DASH' && renderDashboard()}
-        {activeTab === 'USERS' && renderUsers()}
-        {activeTab === 'FINANCE' && renderFinance()}
-        {activeTab === 'PLANS' && renderPlans()}
+      <div className="p-6 pb-24">
+        {activeTab === 'DASH' && (
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
+               <p className="text-3xl font-black text-emerald-600">{users.length}</p>
+               <p className="text-[10px] font-bold text-gray-400 uppercase">Usuários</p>
+            </div>
+            <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
+               <p className="text-xl font-black text-emerald-600">{totalInvested.toFixed(2)}</p>
+               <p className="text-[10px] font-bold text-gray-400 uppercase">Investido (USDT)</p>
+            </div>
+            <div className="bg-emerald-900 col-span-2 p-6 rounded-3xl text-white shadow-xl">
+               <p className="text-[10px] font-black opacity-60 uppercase tracking-widest">Lucro Total</p>
+               <h3 className="text-4xl font-black">{(totalInvested - totalPaid).toFixed(2)} USDT</h3>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'USERS' && (
+          <div className="space-y-4">
+            <input type="text" placeholder="Buscar usuário..." className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm outline-none" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            {filteredUsers.map(u => (
+              <div key={u.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm space-y-3">
+                <div className="flex justify-between">
+                  <div>
+                    <p className="font-bold text-sm">{u.name}</p>
+                    <p className="text-[10px] text-gray-400">{u.email}</p>
+                    <span className="text-[8px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 font-black uppercase border border-emerald-100">{u.activePlanId}</span>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-black text-emerald-600">{u.balance.toFixed(2)}</p>
+                    <p className="text-[8px] text-gray-400 uppercase">Saldo USDT</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => { const val = prompt('Saldo p/ Adicionar ou Remover:'); if(val) onAdjustBalance(u.id, parseFloat(val)); }} className="flex-1 bg-gray-900 text-white text-[9px] font-black py-2 rounded-lg">SALDO</button>
+                  <button onClick={() => { const pid = prompt('VIP ID (vip1, vip2, vip3, vip4):'); if(pid) onGivePlan(u.id, pid); }} className="flex-1 bg-blue-600 text-white text-[9px] font-black py-2 rounded-lg">DAR PLANO</button>
+                  <button onClick={() => onUpdateStatus(u.id, u.status === 'ACTIVE' ? 'BLOCKED' : 'ACTIVE')} className="flex-1 bg-amber-100 text-amber-700 text-[9px] font-black py-2 rounded-lg">{u.status === 'ACTIVE' ? 'BLOQUEAR' : 'ATIVAR'}</button>
+                  <button onClick={() => onDeleteUser(u.id)} className="bg-red-50 text-red-600 p-2 rounded-lg"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeTab === 'FINANCE' && (
+          <div className="space-y-6">
+            <section>
+              <h3 className="text-xs font-black text-gray-400 uppercase mb-3">Depósitos Pendentes</h3>
+              {deposits.filter(d => d.status === 'PENDING').map(req => (
+                <div key={req.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm mb-3">
+                  <div className="flex justify-between items-start mb-2">
+                    <p className="text-xs font-bold">{req.userName} <span className="text-emerald-600">({req.planId || 'Saldo'})</span></p>
+                    <p className="text-xs font-black">{req.amount} USDT</p>
+                  </div>
+                  <p className="text-[8px] font-mono text-gray-400 mb-3 break-all italic">HASH: {req.hash}</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => onApproveDeposit(req.id)} className="flex-1 bg-emerald-600 text-white text-[10px] font-bold py-2.5 rounded-xl">APROVAR</button>
+                    <button onClick={() => onRejectDeposit(req.id)} className="flex-1 bg-gray-100 text-gray-500 text-[10px] font-bold py-2.5 rounded-xl">RECUSAR</button>
+                  </div>
+                </div>
+              ))}
+            </section>
+            <section>
+              <h3 className="text-xs font-black text-gray-400 uppercase mb-3">Saques Pendentes</h3>
+              {withdrawals.filter(w => w.status === 'PENDING').map(req => (
+                <div key={req.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm mb-3">
+                  <p className="text-xs font-bold">{req.userName} - {req.amount} USDT</p>
+                  <p className="text-[8px] text-gray-400 font-mono mb-3 truncate">{req.wallet}</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => onApproveWithdraw(req.id)} className="flex-1 bg-blue-600 text-white text-[10px] font-bold py-2.5 rounded-xl">MARCAR PAGO</button>
+                    <button onClick={() => onRejectWithdraw(req.id)} className="flex-1 bg-gray-100 text-gray-500 text-[10px] font-bold py-2.5 rounded-xl">RECUSAR</button>
+                  </div>
+                </div>
+              ))}
+            </section>
+          </div>
+        )}
       </div>
     </div>
   );
