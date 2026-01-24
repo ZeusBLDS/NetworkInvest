@@ -85,7 +85,6 @@ const App: React.FC = () => {
           status: user.status || 'ACTIVE',
           totalInvested: parseFloat(user.total_invested || 0),
           totalWithdrawn: parseFloat(user.total_withdrawn || 0),
-          // Converte a string de data do banco para número (milissegundos) para a UI
           lastCheckIn: user.last_check_in ? new Date(user.last_check_in).getTime() : undefined,
           lastWheelSpin: user.last_wheel_spin ? new Date(user.last_wheel_spin).getTime() : undefined
         };
@@ -118,7 +117,8 @@ const App: React.FC = () => {
   const performCheckIn = async () => {
     if (!currentUser) return;
 
-    const todayStr = new Date().toDateString();
+    const now = new Date();
+    const todayStr = now.toDateString();
     
     if (currentUser.lastCheckIn) {
       const lastDateStr = new Date(currentUser.lastCheckIn).toDateString();
@@ -143,11 +143,12 @@ const App: React.FC = () => {
     const newBalance = currentUser.balance + reward;
 
     try {
+      // Importante: toISOString() para o Supabase aceitar como TIMESTAMPTZ
       const { error } = await supabase
         .from('profiles')
         .update({
           balance: newBalance,
-          last_check_in: new Date().toISOString(), // Envia como String ISO (formato correto)
+          last_check_in: now.toISOString(),
           check_in_streak: newStreak
         })
         .eq('id', currentUser.id);
@@ -159,6 +160,25 @@ const App: React.FC = () => {
     } catch (err: any) {
       alert('Erro ao processar check-in: ' + err.message);
       return undefined;
+    }
+  };
+
+  const handleWheelWin = async (prize: number) => {
+    if (!currentUser) return;
+    try {
+      // Salva o prêmio e a data do giro
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          balance: currentUser.balance + prize,
+          last_wheel_spin: new Date().toISOString()
+        })
+        .eq('id', currentUser.id);
+
+      if (error) throw error;
+      fetchUserProfile(currentUser.id);
+    } catch (err: any) {
+      alert('Erro ao salvar prêmio: ' + err.message);
     }
   };
 
@@ -283,7 +303,7 @@ const App: React.FC = () => {
         }} />
       )}
       {showWheel && currentUser && (
-        <LuckyWheelModal user={currentUser} onClose={() => setShowWheel(false)} onWin={(prize) => updateBalance(prize)} />
+        <LuckyWheelModal user={currentUser} onClose={() => setShowWheel(false)} onWin={handleWheelWin} />
       )}
     </div>
   );
