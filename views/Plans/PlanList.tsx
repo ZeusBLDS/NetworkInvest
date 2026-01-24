@@ -19,7 +19,7 @@ const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate }) => 
 
       <div className="space-y-6">
         {PLANS.map((plan) => {
-          // VIP 0 é o plano padrão se nenhum outro estiver ativo ou se ele for o selecionado
+          // Lógica robusta: VIP 0 é o atual se o ID bater OU se o usuário não tiver nenhum ID de plano definido
           const isVip0 = plan.id === 'vip0';
           const isCurrent = user.activePlanId === plan.id || (isVip0 && (!user.activePlanId || user.activePlanId === ''));
           const isPending = myDeposits.some(d => d.planId === plan.id && d.status === 'PENDING');
@@ -74,7 +74,7 @@ const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate }) => 
                 disabled={isCurrent || isPending}
                 onClick={() => onActivate(plan.id)}
                 className={`w-full py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all ${
-                  isCurrent ? 'bg-slate-50 text-slate-300 cursor-not-allowed border border-slate-100' :
+                  isCurrent ? 'bg-slate-50 text-slate-300 cursor-not-allowed border border-slate-100 shadow-none' :
                   isPending ? 'bg-amber-50 text-amber-600 border border-amber-100 animate-pulse' :
                   'bg-emerald-600 text-white shadow-xl shadow-emerald-100 active:scale-95 hover:bg-emerald-700'
                 }`}
