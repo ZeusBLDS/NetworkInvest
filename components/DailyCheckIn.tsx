@@ -4,7 +4,7 @@ import { User } from '../types';
 
 interface DailyCheckInProps {
   user: User;
-  onCheckIn: () => Promise<void>;
+  onCheckIn: () => Promise<number | undefined>;
 }
 
 const DailyCheckIn: React.FC<DailyCheckInProps> = ({ user, onCheckIn }) => {
@@ -30,14 +30,17 @@ const DailyCheckIn: React.FC<DailyCheckInProps> = ({ user, onCheckIn }) => {
     }
   }
 
-  const currentDayInCycle = (displayStreak % 30) + 1;
+  const currentDayInCycle = alreadyCheckedIn ? (displayStreak % 30) : ((displayStreak % 30) + 1);
   const earningToday = currentDayInCycle * 0.01;
 
   const handleCheckIn = async () => {
     if (alreadyCheckedIn || loading) return;
     setLoading(true);
     try {
-      await onCheckIn();
+      const reward = await onCheckIn();
+      if (reward) {
+        // Sucesso
+      }
     } finally {
       setLoading(false);
     }
@@ -63,7 +66,9 @@ const DailyCheckIn: React.FC<DailyCheckInProps> = ({ user, onCheckIn }) => {
 
       <div className="flex items-center justify-between bg-emerald-50 rounded-2xl p-4 mb-4">
         <div>
-          <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest opacity-60">Hoje você ganha</p>
+          <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest opacity-60">
+            {alreadyCheckedIn ? 'Você ganhou hoje' : 'Hoje você ganha'}
+          </p>
           <p className="text-2xl font-black text-emerald-800">{earningToday.toFixed(2)} <span className="text-xs font-bold">USDT</span></p>
         </div>
         <div className="text-right">
@@ -87,7 +92,12 @@ const DailyCheckIn: React.FC<DailyCheckInProps> = ({ user, onCheckIn }) => {
           : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 shadow-emerald-100'
         }`}
       >
-        {loading ? 'PROCESSANDO...' : alreadyCheckedIn ? 'CONCLUÍDO POR HOJE' : 'REALIZAR CHECK-IN'}
+        {loading ? (
+          <div className="flex items-center justify-center space-x-2">
+            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            <span>PROCESSANDO...</span>
+          </div>
+        ) : alreadyCheckedIn ? 'CONCLUÍDO POR HOJE' : 'REALIZAR CHECK-IN'}
       </button>
 
       <div className="mt-5 flex gap-1.5 justify-between">

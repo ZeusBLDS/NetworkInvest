@@ -23,13 +23,11 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   
-  // Platform States
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [deposits, setDeposits] = useState<DepositRequest[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawRequest[]>([]);
 
-  // Modals
   const [showWelcome, setShowWelcome] = useState(false);
   const [showVipZero, setShowVipZero] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
@@ -106,7 +104,7 @@ const App: React.FC = () => {
         if (retryCount < 2) {
           setTimeout(() => fetchUserProfile(userId, retryCount + 1), 2000);
         } else {
-          setAuthError("Perfil não encontrado. Verifique se as tabelas foram criadas no Supabase.");
+          setAuthError("Erro ao carregar dados. Rode o script SQL no Supabase.");
           setLoading(false);
         }
       }
@@ -120,22 +118,26 @@ const App: React.FC = () => {
     if (!currentUser) return;
 
     const now = Date.now();
-    const today = new Date().toDateString();
-    const lastCheckInDate = currentUser.lastCheckIn ? new Date(currentUser.lastCheckIn).toDateString() : '';
-
-    if (today === lastCheckInDate) {
-      alert('Você já realizou o check-in hoje!');
-      return;
+    const todayStr = new Date().toDateString();
+    
+    // Verificação local de segurança
+    if (currentUser.lastCheckIn) {
+      const lastDateStr = new Date(currentUser.lastCheckIn).toDateString();
+      if (todayStr === lastDateStr) {
+        alert('Check-in já realizado hoje!');
+        return;
+      }
     }
 
     // Lógica de Streak (sequência)
     let newStreak = 1;
     if (currentUser.lastCheckIn) {
-      const lastCheckInDateObj = new Date(currentUser.lastCheckIn);
+      const lastCheckInDate = new Date(currentUser.lastCheckIn);
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       
-      if (lastCheckInDateObj.toDateString() === yesterday.toDateString()) {
+      // Se o último check-in foi ontem, aumenta a sequência. Caso contrário, volta pra 1.
+      if (lastCheckInDate.toDateString() === yesterday.toDateString()) {
         newStreak = (currentUser.checkInStreak % 30) + 1;
       }
     }
@@ -144,6 +146,7 @@ const App: React.FC = () => {
     const newBalance = currentUser.balance + reward;
 
     try {
+      // Sincronização em uma única transação no Supabase
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -155,10 +158,12 @@ const App: React.FC = () => {
 
       if (error) throw error;
 
-      fetchUserProfile(currentUser.id);
+      // Recarrega o perfil para atualizar o saldo na UI
+      await fetchUserProfile(currentUser.id);
       return reward;
     } catch (err: any) {
       alert('Erro ao processar check-in: ' + err.message);
+      return undefined;
     }
   };
 
@@ -212,7 +217,7 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-emerald-900 text-white p-6 text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white mb-4"></div>
-        <p className="font-bold tracking-widest animate-pulse mb-2 uppercase">Network Invest</p>
+        <p className="font-bold tracking-widest animate-pulse mb-2 uppercase tracking-tight">Network Invest</p>
         <p className="text-[10px] opacity-60">Carregando marketplace...</p>
       </div>
     );
