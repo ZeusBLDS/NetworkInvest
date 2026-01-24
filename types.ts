@@ -31,6 +31,7 @@ export interface User {
   status: UserStatus;
   totalInvested: number;
   totalWithdrawn: number;
+  network_earnings: number; // Adicionado para rastrear lucros de indicação
 }
 
 export interface Plan {
@@ -60,7 +61,7 @@ export interface DepositRequest {
   userName: string;
   amount: number;
   hash: string;
-  planId?: string; // If this deposit was for a specific plan
+  planId?: string;
   timestamp: number;
   status: RequestStatus;
   method: string;
@@ -75,13 +76,4 @@ export interface WithdrawRequest {
   fee: number;
   timestamp: number;
   status: RequestStatus;
-}
-
-export interface PlatformStats {
-  totalUsers: number;
-  activeUsers: number;
-  platformBalance: number;
-  totalInvested: number;
-  totalPaid: number;
-  dailyProfit: number;
 }
