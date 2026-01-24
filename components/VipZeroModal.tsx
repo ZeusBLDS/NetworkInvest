@@ -13,8 +13,8 @@ const VipZeroModal: React.FC<VipZeroModalProps> = ({ onActivate }) => {
         
         <div className="text-center mb-8">
           <div className="text-5xl mb-4">🎁</div>
-          <h2 className="text-3xl font-black text-gray-900 mb-2">Boas-vindas!</h2>
-          <p className="text-gray-500 font-medium">Você recebeu automaticamente o Plano VIP 0.</p>
+          <h2 className="text-3xl font-black text-gray-900 mb-2">Bônus Ativado!</h2>
+          <p className="text-gray-500 font-medium">Você já começou com o Plano VIP 0 ativo em sua conta.</p>
         </div>
         
         <div className="bg-emerald-50 rounded-3xl p-6 mb-8 border border-emerald-100">
@@ -35,14 +35,14 @@ const VipZeroModal: React.FC<VipZeroModalProps> = ({ onActivate }) => {
         </div>
         
         <p className="text-xs text-gray-400 text-center mb-8 leading-relaxed">
-          Ideal para iniciantes começarem a ganhar diariamente de forma simples e segura 🚀
+          Seus lucros automáticos já estão sendo contabilizados. Aproveite! 🚀
         </p>
         
         <button 
           onClick={onActivate}
           className="w-full bg-emerald-600 text-white font-black py-5 rounded-2xl shadow-xl shadow-emerald-100 active:scale-95 transition-all text-lg"
         >
-          ATIVAR MEU PLANO GRATUITO
+          OBRIGADO, VAMOS LÁ!
         </button>
       </div>
     </div>

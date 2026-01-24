@@ -19,8 +19,8 @@ const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate }) => 
 
       <div className="space-y-6">
         {PLANS.map((plan) => {
-          // Lógica robusta: VIP 0 é o atual se o ID bater OU se o usuário não tiver nenhum ID de plano definido
           const isVip0 = plan.id === 'vip0';
+          // O plano é atual se o ID bater OU se for VIP 0 e o usuário não tiver plano definido
           const isCurrent = user.activePlanId === plan.id || (isVip0 && (!user.activePlanId || user.activePlanId === ''));
           const isPending = myDeposits.some(d => d.planId === plan.id && d.status === 'PENDING');
 

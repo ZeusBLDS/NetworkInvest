@@ -16,6 +16,8 @@ interface HomeProps {
 }
 
 const Home: React.FC<HomeProps> = ({ user, myDeposits, performCheckIn, onOpenWithdraw, onOpenDeposit, onOpenWheel }) => {
+  const activePlanName = PLANS.find(p => p.id === user.activePlanId)?.name || 'VIP 0';
+  
   const docs = [
     { label: 'PDF Completo', url: 'https://www.dropbox.com/scl/fi/62z7x3pmvxo261dtw6u30/Network_Invest_PDF_Completo.pdf?rlkey=ud1fybfe5o4w2r3agnmkzg93k&st=ofi9inbd&dl=0', icon: '📄' },
     { label: 'Tabela VIP 90 Dias', url: 'https://www.dropbox.com/scl/fi/62z7x3pmvxo261dtw6u30/Network_Invest_PDF_Completo.pdf?rlkey=ud1fybfe5o4w2r3agnmkzg93k&st=ofi9inbd&dl=0', icon: '📊' }
@@ -43,7 +45,7 @@ const Home: React.FC<HomeProps> = ({ user, myDeposits, performCheckIn, onOpenWit
         </div>
       </div>
 
-      {/* Plano Ativo - Estilo Print */}
+      {/* Plano Ativo - Dinâmico */}
       <div className="space-y-3">
         <div className="bg-white border border-slate-100 p-5 rounded-[28px] flex items-center justify-between shadow-sm relative overflow-hidden">
           <div className="flex items-center space-x-4">
@@ -52,7 +54,7 @@ const Home: React.FC<HomeProps> = ({ user, myDeposits, performCheckIn, onOpenWit
             </div>
             <div>
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Plano em Operação</p>
-              <p className="text-sm font-black text-slate-800 uppercase">VIP 0</p>
+              <p className="text-sm font-black text-slate-800 uppercase">{activePlanName}</p>
             </div>
           </div>
           <div className="text-right">
@@ -75,7 +77,7 @@ const Home: React.FC<HomeProps> = ({ user, myDeposits, performCheckIn, onOpenWit
         <svg className="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" /></svg>
       </button>
 
-      {/* DOCUMENTAÇÃO & GUIAS - Estilo Print */}
+      {/* DOCUMENTAÇÃO & GUIAS */}
       <div className="space-y-3">
         <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Documentação & Guias</h3>
         <div className="bg-white rounded-[32px] border border-slate-100 divide-y divide-slate-50 overflow-hidden shadow-sm">
