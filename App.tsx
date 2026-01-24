@@ -85,8 +85,9 @@ const App: React.FC = () => {
           status: user.status || 'ACTIVE',
           totalInvested: parseFloat(user.total_invested || 0),
           totalWithdrawn: parseFloat(user.total_withdrawn || 0),
-          lastCheckIn: user.last_check_in ? parseInt(user.last_check_in) : undefined,
-          lastWheelSpin: user.last_wheel_spin ? parseInt(user.last_wheel_spin) : undefined
+          // Converte a string de data do banco para número (milissegundos) para a UI
+          lastCheckIn: user.last_check_in ? new Date(user.last_check_in).getTime() : undefined,
+          lastWheelSpin: user.last_wheel_spin ? new Date(user.last_wheel_spin).getTime() : undefined
         };
 
         setCurrentUser(normalizedUser);
@@ -117,10 +118,8 @@ const App: React.FC = () => {
   const performCheckIn = async () => {
     if (!currentUser) return;
 
-    const now = Date.now();
     const todayStr = new Date().toDateString();
     
-    // Verificação local de segurança
     if (currentUser.lastCheckIn) {
       const lastDateStr = new Date(currentUser.lastCheckIn).toDateString();
       if (todayStr === lastDateStr) {
@@ -129,14 +128,12 @@ const App: React.FC = () => {
       }
     }
 
-    // Lógica de Streak (sequência)
     let newStreak = 1;
     if (currentUser.lastCheckIn) {
       const lastCheckInDate = new Date(currentUser.lastCheckIn);
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       
-      // Se o último check-in foi ontem, aumenta a sequência. Caso contrário, volta pra 1.
       if (lastCheckInDate.toDateString() === yesterday.toDateString()) {
         newStreak = (currentUser.checkInStreak % 30) + 1;
       }
@@ -146,19 +143,17 @@ const App: React.FC = () => {
     const newBalance = currentUser.balance + reward;
 
     try {
-      // Sincronização em uma única transação no Supabase
       const { error } = await supabase
         .from('profiles')
         .update({
           balance: newBalance,
-          last_check_in: now,
+          last_check_in: new Date().toISOString(), // Envia como String ISO (formato correto)
           check_in_streak: newStreak
         })
         .eq('id', currentUser.id);
 
       if (error) throw error;
 
-      // Recarrega o perfil para atualizar o saldo na UI
       await fetchUserProfile(currentUser.id);
       return reward;
     } catch (err: any) {

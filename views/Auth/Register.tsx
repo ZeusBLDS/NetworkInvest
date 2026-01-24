@@ -24,7 +24,6 @@ const Register: React.FC<RegisterProps> = ({ onSwitch }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Efeito para capturar o código de indicação da URL (?ref=CÓDIGO)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const refCode = params.get('ref');
@@ -53,6 +52,7 @@ const Register: React.FC<RegisterProps> = ({ onSwitch }) => {
     setLoading(true);
 
     try {
+      // O Supabase Auth cria o usuário e a Trigger SQL cria o perfil
       const { data, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -61,26 +61,24 @@ const Register: React.FC<RegisterProps> = ({ onSwitch }) => {
             name: formData.name,
             phone: formData.phone,
             cpf: formData.cpf,
-            referred_by: referredBy, // Usa o código capturado da URL ou o padrão
-            is_first_login: true,
-            active_plan_id: 'vip0'
+            referred_by: referredBy,
           }
         }
       });
 
-      if (authError) {
-        if (authError.message.includes('rate limit')) {
-          throw new Error('Muitas tentativas. Aguarde alguns minutos ou troque sua rede.');
-        }
-        throw authError;
-      }
+      if (authError) throw authError;
 
       if (data.user) {
-        alert('Cadastro realizado! Agora você pode entrar na sua conta.');
+        alert('Cadastro realizado com sucesso! Use seu e-mail e senha para entrar.');
         onSwitch();
       }
     } catch (err: any) {
-      setError(err.message || 'Erro ao criar conta. Verifique os dados.');
+      console.error("Erro no cadastro:", err);
+      if (err.message.includes('Database error')) {
+        setError('Erro no banco de dados. Certifique-se de que rodou o script SQL no painel do Supabase.');
+      } else {
+        setError(err.message || 'Erro ao criar conta. Verifique os dados ou tente outro e-mail.');
+      }
     } finally {
       setLoading(false);
     }
@@ -95,12 +93,11 @@ const Register: React.FC<RegisterProps> = ({ onSwitch }) => {
         </button>
         <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
            <h2 className="text-xl font-black text-emerald-800 mb-1 uppercase tracking-tight">Crie sua Conta</h2>
-           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Fundação Mobile Sólida e Limpa</p>
+           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Preencha os dados abaixo</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4 pb-12">
-        {/* Campo Quem Convidou - Automático e Não Editável */}
         <div className="space-y-1">
           <label className="text-[10px] font-black text-gray-400 uppercase px-1 tracking-widest">Quem convidou</label>
           <div className="w-full px-5 py-4 rounded-2xl border border-emerald-100 bg-emerald-50 text-emerald-700 font-bold text-sm">
@@ -126,7 +123,7 @@ const Register: React.FC<RegisterProps> = ({ onSwitch }) => {
             <input
               type="text"
               className="w-full px-5 py-4 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 outline-none bg-white text-sm"
-              placeholder="000.000.000-00"
+              placeholder="00000000000"
               value={formData.cpf}
               onChange={(e) => setFormData({...formData, cpf: e.target.value.replace(/\D/g, '')})}
             />
@@ -137,7 +134,7 @@ const Register: React.FC<RegisterProps> = ({ onSwitch }) => {
               type="tel"
               required
               className="w-full px-5 py-4 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 outline-none bg-white text-sm"
-              placeholder="(00) 00000-0000"
+              placeholder="11999999999"
               value={formData.phone}
               onChange={(e) => setFormData({...formData, phone: e.target.value.replace(/\D/g, '')})}
             />
@@ -169,13 +166,10 @@ const Register: React.FC<RegisterProps> = ({ onSwitch }) => {
         </div>
 
         <div className="p-5 bg-emerald-50 rounded-3xl border border-emerald-100 space-y-2">
-          <p className="text-[10px] font-black text-emerald-800 uppercase tracking-widest">Termos e Condições:</p>
+          <p className="text-[10px] font-black text-emerald-800 uppercase tracking-widest">Avisos Legais:</p>
           <p className="text-[10px] text-emerald-700 leading-relaxed font-medium">
-            A presente plataforma não constitui uma plataforma de investimentos regulamentada. 
-            Trata-se de um grupo que opera em mercados de trade e criptomoedas. 
-            <br/><br/>
-            <strong>AVISOS IMPORTANTES:</strong> Toda operação financeira envolve riscos. 
-            Não há garantia de retorno ou preservação do capital. O participante pode perder todo o valor investido.
+            Toda operação financeira envolve riscos. Não há garantia de retorno ou preservação do capital. 
+            O participante pode perder todo o valor investido.
           </p>
         </div>
 
@@ -187,7 +181,7 @@ const Register: React.FC<RegisterProps> = ({ onSwitch }) => {
             onChange={(e) => setFormData({...formData, terms: e.target.checked})}
           />
           <span className="text-[11px] text-gray-500 font-bold leading-tight group-hover:text-gray-700 transition-colors">
-            Li e aceito os termos e condições acima. Ao prosseguir, declaro que compreendi integralmente estes termos.
+            Li e aceito os termos e condições acima.
           </span>
         </label>
 
@@ -202,7 +196,7 @@ const Register: React.FC<RegisterProps> = ({ onSwitch }) => {
           disabled={loading}
           className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-5 rounded-3xl shadow-xl shadow-emerald-100 transition-all transform active:scale-95 disabled:opacity-50 uppercase tracking-widest text-sm"
         >
-          {loading ? 'CRIANDO CONTA...' : 'CADASTRAR AGORA'}
+          {loading ? 'PROCESSANDO...' : 'CADASTRAR AGORA'}
         </button>
       </form>
     </div>
