@@ -1,24 +1,19 @@
 
--- ==========================================
--- 1. LIMPEZA E RESET
--- ==========================================
+-- 1. LIMPEZA TOTAL (CUIDADO: APAGA DADOS EXISTENTES)
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
-DROP FUNCTION IF EXISTS public.is_admin() CASCADE;
 DROP TABLE IF EXISTS public.deposits CASCADE;
 DROP TABLE IF EXISTS public.withdrawals CASCADE;
 DROP TABLE IF EXISTS public.profiles CASCADE;
 
--- ==========================================
--- 2. TABELA DE PERFIS (PROFILES)
--- ==========================================
+-- 2. TABELA DE PERFIS (ESTRUTURA COMPLETA)
 CREATE TABLE public.profiles (
   id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
   name TEXT,
   email TEXT,
   phone TEXT,
   referral_code TEXT UNIQUE,
-  referred_by TEXT DEFAULT 'Direto',
+  referred_by TEXT DEFAULT 'Direto', -- Armazena o CÓDIGO de quem indicou
   balance DECIMAL(12,2) DEFAULT 0,
   wallet_address TEXT,
   active_plan_id TEXT DEFAULT 'vip0',
@@ -26,6 +21,7 @@ CREATE TABLE public.profiles (
   status TEXT DEFAULT 'ACTIVE',
   total_invested DECIMAL(12,2) DEFAULT 0,
   total_withdrawn DECIMAL(12,2) DEFAULT 0,
+  network_earnings DECIMAL(12,2) DEFAULT 0, -- Total ganho com indicações
   is_first_login BOOLEAN DEFAULT TRUE,
   check_in_streak INTEGER DEFAULT 0,
   last_check_in TIMESTAMPTZ,
@@ -33,20 +29,19 @@ CREATE TABLE public.profiles (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ==========================================
--- 3. TABELAS FINANCEIRAS
--- ==========================================
+-- 3. TABELA DE DEPÓSITOS E CONTRATOS
 CREATE TABLE public.deposits (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   user_name TEXT,
   amount DECIMAL(12,2) NOT NULL,
   hash TEXT NOT NULL,
-  plan_id TEXT,
+  plan_id TEXT, 
   status TEXT DEFAULT 'PENDING',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 4. TABELA DE SAQUES
 CREATE TABLE public.withdrawals (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -58,11 +53,7 @@ CREATE TABLE public.withdrawals (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ==========================================
--- 4. FUNÇÕES DE AUTOMAÇÃO (SECURITY DEFINER)
--- ==========================================
-
--- Cria o perfil automaticamente quando alguém se cadastra
+-- 5. AUTOMAÇÃO: CRIAR PERFIL AO REGISTRAR
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -83,25 +74,12 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- Função simplificada de Admin para evitar erros de loop
-CREATE OR REPLACE FUNCTION public.is_admin()
-RETURNS BOOLEAN AS $$
-BEGIN
-  RETURN (SELECT role = 'ADMIN' FROM public.profiles WHERE id = auth.uid());
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- ==========================================
--- 5. POLÍTICAS DE SEGURANÇA (RLS)
--- ==========================================
+-- 6. POLÍTICAS DE SEGURANÇA (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.deposits ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.withdrawals ENABLE ROW LEVEL SECURITY;
 
--- Usuários podem ver seu próprio perfil e admins veem tudo
-CREATE POLICY "profiles_select_all" ON public.profiles FOR SELECT USING (true);
-CREATE POLICY "profiles_update_self" ON public.profiles FOR UPDATE USING (auth.uid() = id OR role = 'ADMIN');
-
--- Regras para Depósitos e Saques
-CREATE POLICY "deposits_access" ON public.deposits FOR ALL USING (auth.uid() = user_id OR (SELECT role = 'ADMIN' FROM public.profiles WHERE id = auth.uid()));
-CREATE POLICY "withdrawals_access" ON public.withdrawals FOR ALL USING (auth.uid() = user_id OR (SELECT role = 'ADMIN' FROM public.profiles WHERE id = auth.uid()));
+CREATE POLICY "Perfis visíveis para todos" ON public.profiles FOR SELECT USING (true);
+CREATE POLICY "Usuários editam próprio perfil ou admin" ON public.profiles FOR UPDATE USING (auth.uid() = id OR (SELECT role = 'ADMIN' FROM public.profiles WHERE id = auth.uid()));
+CREATE POLICY "Acesso total depósitos (Dono/Admin)" ON public.deposits FOR ALL USING (auth.uid() = user_id OR (SELECT role = 'ADMIN' FROM public.profiles WHERE id = auth.uid()));
+CREATE POLICY "Acesso total saques (Dono/Admin)" ON public.withdrawals FOR ALL USING (auth.uid() = user_id OR (SELECT role = 'ADMIN' FROM public.profiles WHERE id = auth.uid()));
