@@ -40,7 +40,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const getPlanName = (planId: string | undefined) => {
     if (!planId) return 'Nenhum';
     const plan = PLANS.find(p => p.id === planId);
-    return plan ? plan.name : 'VIP 0';
+    return plan ? plan.name : planId;
   };
 
   const renderDashboard = () => (
@@ -151,12 +151,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
               <p className="text-[8px] font-mono text-gray-400 break-all mb-3 bg-gray-50 p-2 rounded-lg italic">Hash: {req.hash}</p>
               <div className="flex gap-2">
-                <button onClick={() => onApproveDeposit(req.id)} className="flex-1 bg-emerald-600 text-white text-[10px] font-bold py-2.5 rounded-xl shadow-lg active:scale-95 transition-all uppercase">APROVAR PLANO</button>
+                <button onClick={() => onApproveDeposit(req.id)} className="flex-1 bg-emerald-600 text-white text-[10px] font-bold py-2.5 rounded-xl shadow-lg active:scale-95 transition-all uppercase">APROVAR PAGAMENTO</button>
                 <button onClick={() => onRejectDeposit(req.id)} className="flex-1 bg-gray-100 text-gray-500 text-[10px] font-bold py-2.5 rounded-xl uppercase">RECUSAR</button>
               </div>
             </div>
           ))}
-          {deposits.filter(d => d.status === 'PENDING').length === 0 && <p className="text-center text-gray-400 text-xs py-8 bg-white rounded-2xl border border-dashed border-gray-200">Sem depósitos para análise.</p>}
+          {deposits.filter(d => d.status === 'PENDING').length === 0 && <p className="text-center text-gray-400 text-xs py-8 bg-white rounded-2xl border border-dashed border-gray-200">Sem depósitos pendentes.</p>}
         </div>
       </section>
 
@@ -173,7 +173,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
               <p className="text-[8px] font-mono text-gray-400 break-all mb-3 bg-gray-50 p-2 rounded-lg">Carteira: {req.wallet}</p>
               <div className="flex gap-2">
-                <button onClick={() => onApproveWithdraw(req.id)} className="flex-1 bg-emerald-600 text-white text-[10px] font-bold py-2.5 rounded-xl shadow-lg active:scale-95 transition-all">PAGO</button>
+                <button onClick={() => onApproveWithdraw(req.id)} className="flex-1 bg-emerald-600 text-white text-[10px] font-bold py-2.5 rounded-xl shadow-lg active:scale-95 transition-all">MARCAR PAGO</button>
                 <button onClick={() => onRejectWithdraw(req.id)} className="flex-1 bg-gray-100 text-gray-500 text-[10px] font-bold py-2.5 rounded-xl">RECUSAR</button>
               </div>
             </div>
@@ -181,6 +181,30 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           {withdrawals.filter(w => w.status === 'PENDING').length === 0 && <p className="text-center text-gray-400 text-xs py-8 bg-white rounded-2xl border border-dashed border-gray-200">Sem saques pendentes.</p>}
         </div>
       </section>
+    </div>
+  );
+
+  const renderPlans = () => (
+    <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+      <h3 className="text-lg font-bold">Gestão de Planos</h3>
+      <div className="grid grid-cols-1 gap-3">
+        {PLANS.map(plan => (
+          <div key={plan.id} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 font-black text-xs uppercase">
+                {plan.id.replace('vip', 'V')}
+              </div>
+              <div>
+                <p className="font-bold text-gray-900 text-sm">{plan.name}</p>
+                <p className="text-[10px] text-gray-400">Investimento: {plan.investment} USDT</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] font-black text-emerald-600">RT: {plan.dailyReturn.toFixed(2)} / dia</p>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 
@@ -200,7 +224,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         {[
           { id: 'DASH', label: 'Resumo', icon: '📊' },
           { id: 'USERS', label: 'Usuários', icon: '👥' },
-          { id: 'FINANCE', label: 'Financeiro', icon: '💰' }
+          { id: 'FINANCE', label: 'Financeiro', icon: '💰' },
+          { id: 'PLANS', label: 'Planos', icon: '💼' }
         ].map(tab => (
           <button
             key={tab.id}
@@ -221,6 +246,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         {activeTab === 'DASH' && renderDashboard()}
         {activeTab === 'USERS' && renderUsers()}
         {activeTab === 'FINANCE' && renderFinance()}
+        {activeTab === 'PLANS' && renderPlans()}
       </div>
     </div>
   );

@@ -98,7 +98,6 @@ const App: React.FC = () => {
         }
 
         if (normalizedUser.role === 'ADMIN') fetchAdminData();
-        setCurrentView(AppView.HOME);
         setLoading(false);
       } else {
         if (retryCount < 2) {
@@ -162,7 +161,7 @@ const App: React.FC = () => {
       if (d.data) setDeposits(d.data.map((req: any) => ({
         id: req.id, userId: req.user_id, userName: req.user_name,
         amount: parseFloat(req.amount), hash: req.hash, planId: req.plan_id,
-        status: req.status, timestamp: new Date(req.created_at).getTime()
+        status: req.status, timestamp: new Date(req.created_at).getTime(), method: 'USDT'
       })) as any);
       if (w.data) setWithdrawals(w.data.map((req: any) => ({
         id: req.id, userId: req.user_id, userName: req.user_name,
@@ -204,25 +203,31 @@ const App: React.FC = () => {
       case AppView.HOME:
         return <Home user={currentUser} updateBalance={updateBalance} performCheckIn={performCheckIn} addNotification={() => {}} onOpenWithdraw={() => setShowWithdraw(true)} onOpenDeposit={() => { setPendingPlanId(null); setShowDeposit(true); }} onOpenWheel={() => setShowWheel(true)} />;
       case AppView.PLANS:
-        // Fixed: Use 'currentUser' instead of 'user' inside onActivate callback to resolve "Cannot find name 'user'" error
         return <PlanList user={currentUser} onActivate={(planId) => { if (currentUser.activePlanId === planId) alert('Plano já ativo!'); else { setPendingPlanId(planId); setShowDeposit(true); } }} />;
       case AppView.NETWORK:
         return <NetworkView user={currentUser} />;
       case AppView.ACCOUNT:
         return <Account user={currentUser} onLogout={() => supabase.auth.signOut()} notifications={notifications} onViewChange={setCurrentView} onUpdateUser={async (u) => { await supabase.from('profiles').update({ wallet_address: u.walletAddress }).eq('id', u.id); fetchUserProfile(u.id); }} />;
       case AppView.ADMIN:
-        return <AdminPanel users={allUsers} deposits={deposits} withdrawals={withdrawals} onClose={() => setCurrentView(AppView.ACCOUNT)} 
+        return <AdminPanel 
+          users={allUsers} 
+          deposits={deposits} 
+          withdrawals={withdrawals} 
+          onClose={() => setCurrentView(AppView.ACCOUNT)} 
           onApproveDeposit={async (id) => { 
             const req = deposits.find(d => d.id === id);
             if (req) {
               await supabase.from('deposits').update({ status: 'APPROVED' }).eq('id', id);
               const u = allUsers.find(user => user.id === req.userId);
               if (u) {
-                await supabase.from('profiles').update({ 
-                  balance: u.balance + (req.planId ? 0 : req.amount), 
+                const updatePayload: any = {
                   active_plan_id: req.planId || u.activePlanId,
                   total_invested: (u.totalInvested || 0) + req.amount
-                }).eq('id', req.userId);
+                };
+                if (!req.planId) {
+                   updatePayload.balance = u.balance + req.amount;
+                }
+                await supabase.from('profiles').update(updatePayload).eq('id', req.userId);
                 fetchAdminData();
                 if (currentUser?.id === req.userId) fetchUserProfile(req.userId);
               }
