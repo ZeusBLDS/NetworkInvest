@@ -37,14 +37,17 @@ const App: React.FC = () => {
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
 
   useEffect(() => {
+    // Verificar sessão inicial
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) fetchUserProfile(session.user.id);
       else setLoading(false);
     });
 
+    // Escutar mudanças na autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) fetchUserProfile(session.user.id);
-      else {
+      if (session) {
+        fetchUserProfile(session.user.id);
+      } else {
         setCurrentUser(null);
         setCurrentView(AppView.LOGIN);
         setLoading(false);
@@ -54,7 +57,7 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchUserProfile = async (userId: string) => {
+  const fetchUserProfile = async (userId: string, retryCount = 0) => {
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -63,21 +66,40 @@ const App: React.FC = () => {
 
     if (data) {
       const user = data as any;
-      setCurrentUser(user);
+      // Normalizar nomes do banco (snake_case) para o app (camelCase)
+      const normalizedUser: User = {
+        ...user,
+        referralCode: user.referral_code,
+        referredBy: user.referred_by,
+        activePlanId: user.active_plan_id,
+        isFirstLogin: user.is_first_login,
+        checkInStreak: user.check_in_streak,
+        lastCheckIn: user.last_check_in,
+        lastWheelSpin: user.last_wheel_spin,
+        totalInvested: user.total_invested,
+        totalWithdrawn: user.total_withdrawn,
+        walletAddress: user.wallet_address
+      };
+
+      setCurrentUser(normalizedUser);
       
-      // Lógica de Primeiro Login / VIP 0
-      if (user.is_first_login) {
+      if (normalizedUser.isFirstLogin) {
         setShowWelcome(true);
         setShowVipZero(true);
-        // Desativar flag de primeiro login no banco
         await supabase.from('profiles').update({ is_first_login: false }).eq('id', userId);
       }
 
-      if (user.role === 'ADMIN') fetchAdminData();
+      if (normalizedUser.role === 'ADMIN') fetchAdminData();
       setLoading(false);
       setCurrentView(AppView.HOME);
     } else {
-      setLoading(false);
+      // Se deu erro ou não achou, e é um cadastro novo, pode haver um delay no Trigger do banco
+      if (retryCount < 3) {
+        setTimeout(() => fetchUserProfile(userId, retryCount + 1), 1500);
+      } else {
+        setLoading(false);
+        if (error) console.error("Erro ao carregar perfil:", error.message);
+      }
     }
   };
 
@@ -93,6 +115,7 @@ const App: React.FC = () => {
   };
 
   const handleLogout = async () => {
+    await setLoading(true);
     await supabase.auth.signOut();
   };
 
@@ -207,7 +230,15 @@ const App: React.FC = () => {
           user={currentUser} 
           onLogout={handleLogout} 
           notifications={notifications} 
-          onUpdateUser={async (u) => { await supabase.from('profiles').update(u).eq('id', u.id); fetchUserProfile(u.id); }} 
+          onUpdateUser={async (u) => { 
+            const updates = {
+              wallet_address: u.walletAddress,
+              name: u.name,
+              phone: u.phone
+            };
+            await supabase.from('profiles').update(updates).eq('id', u.id); 
+            fetchUserProfile(u.id); 
+          }} 
         />;
       case AppView.ADMIN:
         return (
@@ -261,7 +292,7 @@ const App: React.FC = () => {
           onClose={() => { setShowDeposit(false); setPendingPlanId(null); }} 
           onConfirm={(hash) => {
             const plan = PLANS.find(p => p.id === pendingPlanId);
-            createDepositRequest(hash, plan ? plan.investment : 0, pendingPlanId || undefined);
+            createDepositRequest(hash, plan ? plan.investment : (showDeposit ? 0 : 0), pendingPlanId || undefined);
             setShowDeposit(false);
           }} 
         />

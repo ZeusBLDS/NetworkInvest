@@ -25,10 +25,20 @@ const Login: React.FC<LoginProps> = ({ onSwitch }) => {
         password,
       });
 
-      if (authError) throw authError;
+      if (authError) {
+        if (authError.message.includes('Email not confirmed')) {
+          setError('Seu e-mail ainda não foi confirmado. Verifique sua caixa de entrada ou peça ao administrador para liberar sua conta.');
+        } else if (authError.message.includes('Invalid login credentials')) {
+          setError('E-mail ou senha incorretos.');
+        } else {
+          setError(authError.message);
+        }
+        throw authError;
+      }
+      
       // O App.tsx cuidará de detectar a mudança de sessão e carregar o perfil
     } catch (err: any) {
-      setError(err.message || 'Erro ao entrar. Verifique suas credenciais.');
+      console.error('Login error:', err);
     } finally {
       setLoading(false);
     }
@@ -41,46 +51,50 @@ const Login: React.FC<LoginProps> = ({ onSwitch }) => {
           <svg className="w-12 h-12 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
         </div>
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Network Invest</h1>
-        <p className="text-gray-500">Global Market - Marketplace de Investimentos</p>
+        <p className="text-gray-500 text-sm">Global Market - Marketplace de Investimentos</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+        <div className="space-y-1">
+          <label className="block text-xs font-bold text-gray-400 uppercase px-1">Email</label>
           <input
             type="email"
             required
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+            className="w-full px-4 py-4 rounded-2xl border border-gray-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all bg-gray-50/50"
             placeholder="exemplo@gmail.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+        <div className="space-y-1">
+          <label className="block text-xs font-bold text-gray-400 uppercase px-1">Senha</label>
           <input
             type="password"
             required
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+            className="w-full px-4 py-4 rounded-2xl border border-gray-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all bg-gray-50/50"
             placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
         </div>
 
-        {error && <p className="text-red-500 text-xs italic bg-red-50 p-2 rounded-lg">{error}</p>}
+        {error && (
+          <div className="bg-red-50 border border-red-100 p-3 rounded-xl">
+            <p className="text-red-600 text-[10px] font-bold text-center leading-tight uppercase">{error}</p>
+          </div>
+        )}
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-4 rounded-xl shadow-lg shadow-emerald-200 transition-all transform active:scale-95 disabled:opacity-50"
+          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-5 rounded-2xl shadow-xl shadow-emerald-100 transition-all transform active:scale-95 disabled:opacity-50 uppercase tracking-widest text-sm"
         >
           {loading ? 'Entrando...' : 'Entrar'}
         </button>
       </form>
 
       <div className="mt-8 text-center">
-        <button onClick={onSwitch} className="text-emerald-600 font-medium hover:underline">
+        <button onClick={onSwitch} className="text-emerald-600 text-sm font-bold hover:underline">
           Não tem uma conta? Criar conta
         </button>
       </div>
