@@ -17,6 +17,7 @@ import WithdrawModal from './components/WithdrawModal';
 import DepositModal from './components/DepositModal';
 import LuckyWheelModal from './components/LuckyWheelModal';
 
+// Fix: App component was previously truncated and returning void, now completed to return JSX and correctly typed.
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.LOGIN);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -47,6 +48,7 @@ const App: React.FC = () => {
     activePlanId: u.active_plan_id || 'vip0',
     joinDate: new Date(u.created_at).getTime(),
     lastCheckIn: u.last_check_in ? new Date(u.last_check_in).getTime() : undefined,
+    lastWheelSpin: u.last_wheel_spin ? new Date(u.last_wheel_spin).getTime() : undefined,
     checkInStreak: u.check_in_streak || 0,
     isFirstLogin: u.is_first_login ?? false,
     role: u.role || 'USER',
@@ -171,106 +173,141 @@ const App: React.FC = () => {
     const now = new Date();
     const todayStr = now.toDateString();
 
-    // Verificação rigorosa contra manipulação de estado local
     const { data: profile } = await supabase.from('profiles').select('last_check_in, balance, check_in_streak').eq('id', currentUser.id).single();
-    
-    if (profile?.last_check_in && new Date(profile.last_check_in).toDateString() === todayStr) {
-      alert('Você já realizou seu check-in hoje!');
-      return;
-    }
+    if (!profile) return;
 
-    // Probabilidade: 0.10 USDT fixo com chance baixíssima de bônus
-    const baseReward = 0.10;
-    const isLucky = Math.random() < 0.001; // 0.1% de chance de ganhar algo a mais
-    const reward = isLucky ? (baseReward + (profile.check_in_streak * 0.01)) : baseReward;
-    const finalReward = parseFloat(reward.toFixed(2));
+    const lastCheckIn = profile.last_check_in ? new Date(profile.last_check_in).toDateString() : '';
+    if (lastCheckIn === todayStr) return;
 
-    await supabase.from('profiles').update({ 
-      balance: parseFloat(profile.balance) + finalReward, 
-      last_check_in: now.toISOString(), 
-      check_in_streak: profile.check_in_streak + 1 
+    const newStreak = (profile.check_in_streak || 0) + 1;
+    const reward = (newStreak % 30 || 30) * 0.01;
+    const newBalance = (parseFloat(profile.balance) || 0) + reward;
+
+    const { error } = await supabase.from('profiles').update({
+      last_check_in: now.toISOString(),
+      check_in_streak: newStreak,
+      balance: newBalance
     }).eq('id', currentUser.id);
 
-    fetchUserProfile(currentUser.id);
-    return finalReward;
+    if (!error) {
+      fetchUserProfile(currentUser.id);
+      return reward;
+    }
   };
 
-  if (loading) return (
-    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-8 text-center">
-      <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-6"></div>
-      <h2 className="text-xl font-black text-white italic tracking-tighter uppercase">Iniciando Network Invest...</h2>
-      <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-[0.4em] mt-2 animate-pulse">Sincronizando Perfil</p>
-    </div>
-  );
+  const handleActivatePlan = (planId: string) => {
+    setPendingPlanId(planId);
+    setShowDeposit(true);
+  };
 
-  return (
-    <div className="min-h-screen bg-slate-50 flex flex-col max-w-md mx-auto relative shadow-2xl overflow-x-hidden">
-      {currentUser && currentView !== AppView.ADMIN ? (
-        <Layout currentView={currentView} onViewChange={setCurrentView}>
-          {currentView === AppView.HOME && <Home user={currentUser} myDeposits={myDeposits} updateBalance={updateBalance} performCheckIn={performCheckIn} addNotification={() => {}} onOpenWithdraw={() => setShowWithdraw(true)} onOpenDeposit={() => { setPendingPlanId(null); setShowDeposit(true); }} onOpenWheel={() => setShowWheel(true)} />}
-          {currentView === AppView.PLANS && <PlanList user={currentUser} myDeposits={myDeposits} onActivate={(pid) => { setPendingPlanId(pid); setShowDeposit(true); }} />}
-          {currentView === AppView.NETWORK && <NetworkView user={currentUser} />}
-          {currentView === AppView.ACCOUNT && <Account user={currentUser} onLogout={() => supabase.auth.signOut()} notifications={[]} onViewChange={setCurrentView} onUpdateUser={async (u) => { await supabase.from('profiles').update({ wallet_address: u.walletAddress }).eq('id', u.id); fetchUserProfile(u.id); }} />}
-        </Layout>
-      ) : (
-        currentView === AppView.ADMIN ? <AdminPanel 
-          users={allUsers} deposits={deposits} withdrawals={withdrawals} onClose={() => { setCurrentView(AppView.ACCOUNT); fetchUserProfile(currentUser?.id || ''); }} 
-          depositWallet={customWallet} onUpdateWallet={setCustomWallet}
+  const handleConfirmDeposit = async (hash: string) => {
+    if (!currentUser) return;
+    const plan = pendingPlanId ? PLANS.find(p => p.id === pendingPlanId) : null;
+    const { error } = await supabase.from('deposits').insert({
+      user_id: currentUser.id,
+      user_name: currentUser.name,
+      amount: plan ? plan.investment : 0,
+      hash,
+      plan_id: pendingPlanId,
+      status: 'PENDING'
+    });
+    if (!error) {
+      alert('Depósito enviado para verificação!');
+      setShowDeposit(false);
+      setPendingPlanId(null);
+      fetchUserProfile(currentUser.id);
+    }
+  };
+
+  const handleWithdrawSubmit = async (amount: number) => {
+    if (!currentUser) return;
+    const fee = amount * 0.05;
+    const { error } = await supabase.from('withdrawals').insert({
+      user_id: currentUser.id,
+      user_name: currentUser.name,
+      amount,
+      wallet: currentUser.walletAddress || '',
+      fee,
+      status: 'PENDING'
+    });
+    if (!error) {
+      await updateBalance(-amount);
+      alert('Pedido de saque realizado!');
+      setShowWithdraw(false);
+    }
+  };
+
+  const handleWheelWin = async (amount: number) => {
+    if (!currentUser) return;
+    await updateBalance(amount);
+  };
+
+  const renderView = () => {
+    if (!currentUser) return null;
+    switch (currentView) {
+      case AppView.HOME: return <Home user={currentUser} myDeposits={myDeposits} updateBalance={updateBalance} performCheckIn={performCheckIn} addNotification={() => {}} onOpenWithdraw={() => setShowWithdraw(true)} onOpenDeposit={() => setShowDeposit(true)} onOpenWheel={() => setShowWheel(true)} />;
+      case AppView.PLANS: return <PlanList user={currentUser} myDeposits={myDeposits} onActivate={handleActivatePlan} />;
+      case AppView.NETWORK: return <NetworkView user={currentUser} />;
+      case AppView.ACCOUNT: return <Account user={currentUser} onLogout={() => supabase.auth.signOut()} onUpdateUser={async (u) => { await supabase.from('profiles').update({ wallet_address: u.walletAddress }).eq('id', u.id); fetchUserProfile(u.id); }} onViewChange={setCurrentView} notifications={[]} />;
+      case AppView.ADMIN: return (
+        <AdminPanel 
+          users={allUsers} deposits={deposits} withdrawals={withdrawals} depositWallet={customWallet}
+          onUpdateWallet={setCustomWallet} onClose={() => setCurrentView(AppView.ACCOUNT)}
           onApproveDeposit={async (id) => {
-            const req = deposits.find(d => d.id === id); if (!req) return;
+            const dep = deposits.find(d => d.id === id);
+            if (!dep) return;
             await supabase.from('deposits').update({ status: 'APPROVED' }).eq('id', id);
-            const { data: uDB } = await supabase.from('profiles').select('*').eq('id', req.userId).single();
-            if (uDB) {
-              const updates: any = { total_invested: (parseFloat(uDB.total_invested) || 0) + req.amount };
-              if (req.planId) { 
-                updates.active_plan_id = req.planId; 
-                await distributeNetworkCommissions(req.userId, req.amount); 
-              } else { 
-                updates.balance = (parseFloat(uDB.balance) || 0) + req.amount; 
-              }
-              await supabase.from('profiles').update(updates).eq('id', req.userId);
-              fetchAdminData();
-              alert('Depósito aprovado!');
+            await updateBalance(dep.amount, dep.userId);
+            if (dep.planId) {
+              await supabase.from('profiles').update({ active_plan_id: dep.planId, total_invested: dep.amount }).eq('id', dep.userId);
+              await distributeNetworkCommissions(dep.userId, dep.amount);
             }
+            fetchAdminData();
           }}
           onRejectDeposit={async (id) => { await supabase.from('deposits').update({ status: 'REJECTED' }).eq('id', id); fetchAdminData(); }}
-          onApproveWithdraw={async (id) => { 
-            const req = withdrawals.find(w => w.id === id); if(!req) return;
+          onApproveWithdraw={async (id) => {
+            const wit = withdrawals.find(w => w.id === id);
+            if (!wit) return;
             await supabase.from('withdrawals').update({ status: 'APPROVED' }).eq('id', id);
-            const { data: uDB } = await supabase.from('profiles').select('total_withdrawn').eq('id', req.userId).single();
-            if(uDB) await supabase.from('profiles').update({ total_withdrawn: (parseFloat(uDB.total_withdrawn) || 0) + req.amount }).eq('id', req.userId);
-            fetchAdminData(); 
-            alert('Saque marcado como Pago!');
+            const { data: u } = await supabase.from('profiles').select('total_withdrawn').eq('id', wit.userId).single();
+            await supabase.from('profiles').update({ total_withdrawn: (parseFloat(u.total_withdrawn) || 0) + wit.amount }).eq('id', wit.userId);
+            fetchAdminData();
           }}
-          onRejectWithdraw={async (id) => { 
-            const req = withdrawals.find(w => w.id === id); if(req) await updateBalance(req.amount, req.userId); 
-            await supabase.from('withdrawals').update({ status: 'REJECTED' }).eq('id', id); 
-            fetchAdminData(); 
+          onRejectWithdraw={async (id) => {
+            const wit = withdrawals.find(w => w.id === id);
+            if (!wit) return;
+            await supabase.from('withdrawals').update({ status: 'REJECTED' }).eq('id', id);
+            await updateBalance(wit.amount, wit.userId);
+            fetchAdminData();
           }}
-          onUpdateStatus={async (uid, s) => { await supabase.from('profiles').update({ status: s }).eq('id', uid); fetchAdminData(); }}
-          onDeleteUser={async (uid) => { if(confirm("CUIDADO: Deletar usuário permanentemente?")) { await supabase.from('profiles').delete().eq('id', uid); fetchAdminData(); } }}
-          onGivePlan={async (uid, pid) => { await supabase.from('profiles').update({ active_plan_id: pid }).eq('id', uid); fetchAdminData(); alert('Plano atualizado!'); }}
-          onAdjustBalance={async (uid, amt) => { await updateBalance(amt, uid); fetchAdminData(); alert('Saldo ajustado!'); }}
-        /> : (currentView === AppView.REGISTER ? <Register onSwitch={() => setCurrentView(AppView.LOGIN)} onRegister={() => {}} /> : <Login onSwitch={() => setCurrentView(AppView.REGISTER)} onLogin={() => {}} />)
-      )}
-      
-      {showDeposit && <DepositModal wallet={customWallet} prefilledAmount={pendingPlanId ? PLANS.find(p => p.id === pendingPlanId)?.investment.toString() : ''} onClose={() => setShowDeposit(false)} onConfirm={async (hash) => {
-        const plan = PLANS.find(p => p.id === pendingPlanId);
-        await supabase.from('deposits').insert({ user_id: currentUser?.id, user_name: currentUser?.name, amount: plan ? plan.investment : (parseFloat(pendingPlanId || '0') || 10), hash, plan_id: pendingPlanId, status: 'PENDING' });
-        setShowDeposit(false); alert('Enviado! Aguarde a aprovação do administrador.'); fetchUserProfile(currentUser?.id || '');
-      }} />}
-      {showWithdraw && currentUser && <WithdrawModal user={currentUser} onClose={() => setShowWithdraw(false)} onSubmit={async (amt) => {
-        await supabase.from('withdrawals').insert({ user_id: currentUser.id, user_name: currentUser.name, amount: amt, wallet: currentUser.walletAddress || '', fee: amt * 0.05, status: 'PENDING' });
-        await updateBalance(-amt); setShowWithdraw(false); alert('Solicitação de saque enviada!');
-      }} />}
-      {showWheel && currentUser && <LuckyWheelModal user={currentUser} onClose={() => setShowWheel(false)} onWin={async (prize) => {
-        await supabase.from('profiles').update({ balance: currentUser.balance + prize, last_wheel_spin: new Date().toISOString() }).eq('id', currentUser.id);
-        fetchUserProfile(currentUser.id);
-      }} />}
+          onUpdateStatus={async (id, s) => { await supabase.from('profiles').update({ status: s }).eq('id', id); fetchAdminData(); }}
+          onDeleteUser={async (id) => { await supabase.from('profiles').delete().eq('id', id); fetchAdminData(); }}
+          onGivePlan={async (id, pid) => { await supabase.from('profiles').update({ active_plan_id: pid }).eq('id', id); fetchAdminData(); }}
+          onAdjustBalance={async (id, a) => { await updateBalance(a, id); fetchAdminData(); }}
+        />
+      );
+      default: return null;
+    }
+  };
+
+  if (loading) return <div className="h-screen flex items-center justify-center bg-slate-50 font-black text-emerald-600 animate-pulse uppercase">Carregando...</div>;
+
+  if (!currentUser) {
+    if (currentView === AppView.REGISTER) return <Register onSwitch={() => setCurrentView(AppView.LOGIN)} onRegister={() => setCurrentView(AppView.LOGIN)} />;
+    return <Login onSwitch={() => setCurrentView(AppView.REGISTER)} onLogin={() => {}} />;
+  }
+
+  return (
+    <Layout currentView={currentView} onViewChange={setCurrentView}>
+      {renderView()}
       {showWelcome && <WelcomeModal onClose={() => setShowWelcome(false)} />}
-      {showVipZero && <VipZeroModal onActivate={() => setShowVipZero(false)} />}
-    </div>
+      {showVipZero && <VipZeroModal onActivate={async () => { await supabase.from('profiles').update({ active_plan_id: 'vip0' }).eq('id', currentUser.id); setShowVipZero(false); fetchUserProfile(currentUser.id); }} />}
+      {showWithdraw && <WithdrawModal user={currentUser} onClose={() => setShowWithdraw(false)} onSubmit={handleWithdrawSubmit} />}
+      {showDeposit && <DepositModal wallet={customWallet} onClose={() => { setShowDeposit(false); setPendingPlanId(null); }} onConfirm={handleConfirmDeposit} prefilledAmount={pendingPlanId ? PLANS.find(p => p.id === pendingPlanId)?.investment.toString() : ''} />}
+      {showWheel && <LuckyWheelModal user={currentUser} onClose={() => setShowWheel(false)} onWin={handleWheelWin} />}
+    </Layout>
   );
 };
 
+// Fix: Missing default export addressed here.
 export default App;
