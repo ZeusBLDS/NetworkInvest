@@ -46,6 +46,7 @@ const App: React.FC = () => {
     walletAddress: u.wallet_address || '',
     activePlanId: u.active_plan_id || 'vip0',
     joinDate: new Date(u.created_at).getTime(),
+    lastCheckIn: u.last_check_in ? new Date(u.last_check_in).getTime() : undefined,
     checkInStreak: u.check_in_streak || 0,
     isFirstLogin: u.is_first_login ?? false,
     role: u.role || 'USER',
@@ -63,7 +64,7 @@ const App: React.FC = () => {
         const user = mapUserFromDB(data);
         setCurrentUser(user);
         
-        const { data: deps } = await supabase.from('deposits').select('*').eq('user_id', userId);
+        const { data: deps } = await supabase.from('deposits').select('*').eq('user_id', userId).order('created_at', { ascending: false });
         if (deps) setMyDeposits(deps.map((req: any) => ({
           id: req.id, userId: req.user_id, userName: req.user_name,
           amount: parseFloat(req.amount), hash: req.hash, planId: req.plan_id,
@@ -84,7 +85,6 @@ const App: React.FC = () => {
       } else if (retryCount < 3) {
         setTimeout(() => fetchUserProfile(userId, retryCount + 1), 2000);
       } else {
-        // CRIAÇÃO MANUAL DE PERFIL (CASO O TRIGGER DO SUPABASE FALHE)
         const { data: { user: authUser } } = await supabase.auth.getUser();
         if (authUser) {
           const { error: insertError } = await supabase.from('profiles').insert({
@@ -160,7 +160,8 @@ const App: React.FC = () => {
     if (!id) return;
     const { data } = await supabase.from('profiles').select('balance').eq('id', id).single();
     if (data) {
-      await supabase.from('profiles').update({ balance: (parseFloat(data.balance) || 0) + amount }).eq('id', id);
+      const newBalance = (parseFloat(data.balance) || 0) + amount;
+      await supabase.from('profiles').update({ balance: newBalance }).eq('id', id);
       if (id === currentUser?.id) fetchUserProfile(id);
     }
   };
@@ -168,13 +169,30 @@ const App: React.FC = () => {
   const performCheckIn = async () => {
     if (!currentUser) return;
     const now = new Date();
-    if (currentUser.lastCheckIn && new Date(currentUser.lastCheckIn).toDateString() === now.toDateString()) {
-      alert('Check-in já realizado hoje!'); return;
+    const todayStr = now.toDateString();
+
+    // Verificação rigorosa contra manipulação de estado local
+    const { data: profile } = await supabase.from('profiles').select('last_check_in, balance, check_in_streak').eq('id', currentUser.id).single();
+    
+    if (profile?.last_check_in && new Date(profile.last_check_in).toDateString() === todayStr) {
+      alert('Você já realizou seu check-in hoje!');
+      return;
     }
-    const reward = (currentUser.checkInStreak + 1) * 0.01;
-    await supabase.from('profiles').update({ balance: currentUser.balance + reward, last_check_in: now.toISOString(), check_in_streak: currentUser.checkInStreak + 1 }).eq('id', currentUser.id);
+
+    // Probabilidade: 0.10 USDT fixo com chance baixíssima de bônus
+    const baseReward = 0.10;
+    const isLucky = Math.random() < 0.001; // 0.1% de chance de ganhar algo a mais
+    const reward = isLucky ? (baseReward + (profile.check_in_streak * 0.01)) : baseReward;
+    const finalReward = parseFloat(reward.toFixed(2));
+
+    await supabase.from('profiles').update({ 
+      balance: parseFloat(profile.balance) + finalReward, 
+      last_check_in: now.toISOString(), 
+      check_in_streak: profile.check_in_streak + 1 
+    }).eq('id', currentUser.id);
+
     fetchUserProfile(currentUser.id);
-    return reward;
+    return finalReward;
   };
 
   if (loading) return (
@@ -196,7 +214,7 @@ const App: React.FC = () => {
         </Layout>
       ) : (
         currentView === AppView.ADMIN ? <AdminPanel 
-          users={allUsers} deposits={deposits} withdrawals={withdrawals} onClose={() => setCurrentView(AppView.HOME)} 
+          users={allUsers} deposits={deposits} withdrawals={withdrawals} onClose={() => { setCurrentView(AppView.ACCOUNT); fetchUserProfile(currentUser?.id || ''); }} 
           depositWallet={customWallet} onUpdateWallet={setCustomWallet}
           onApproveDeposit={async (id) => {
             const req = deposits.find(d => d.id === id); if (!req) return;
@@ -204,20 +222,35 @@ const App: React.FC = () => {
             const { data: uDB } = await supabase.from('profiles').select('*').eq('id', req.userId).single();
             if (uDB) {
               const updates: any = { total_invested: (parseFloat(uDB.total_invested) || 0) + req.amount };
-              if (req.planId) { updates.active_plan_id = req.planId; await distributeNetworkCommissions(req.userId, req.amount); }
-              else { updates.balance = (parseFloat(uDB.balance) || 0) + req.amount; }
+              if (req.planId) { 
+                updates.active_plan_id = req.planId; 
+                await distributeNetworkCommissions(req.userId, req.amount); 
+              } else { 
+                updates.balance = (parseFloat(uDB.balance) || 0) + req.amount; 
+              }
               await supabase.from('profiles').update(updates).eq('id', req.userId);
               fetchAdminData();
-              alert('Plano ativado com sucesso!');
+              alert('Depósito aprovado!');
             }
           }}
           onRejectDeposit={async (id) => { await supabase.from('deposits').update({ status: 'REJECTED' }).eq('id', id); fetchAdminData(); }}
-          onApproveWithdraw={async (id) => { await supabase.from('withdrawals').update({ status: 'APPROVED' }).eq('id', id); fetchAdminData(); }}
-          onRejectWithdraw={async (id) => { const req = withdrawals.find(w => w.id === id); if(req) await updateBalance(req.amount, req.userId); await supabase.from('withdrawals').update({ status: 'REJECTED' }).eq('id', id); fetchAdminData(); }}
+          onApproveWithdraw={async (id) => { 
+            const req = withdrawals.find(w => w.id === id); if(!req) return;
+            await supabase.from('withdrawals').update({ status: 'APPROVED' }).eq('id', id);
+            const { data: uDB } = await supabase.from('profiles').select('total_withdrawn').eq('id', req.userId).single();
+            if(uDB) await supabase.from('profiles').update({ total_withdrawn: (parseFloat(uDB.total_withdrawn) || 0) + req.amount }).eq('id', req.userId);
+            fetchAdminData(); 
+            alert('Saque marcado como Pago!');
+          }}
+          onRejectWithdraw={async (id) => { 
+            const req = withdrawals.find(w => w.id === id); if(req) await updateBalance(req.amount, req.userId); 
+            await supabase.from('withdrawals').update({ status: 'REJECTED' }).eq('id', id); 
+            fetchAdminData(); 
+          }}
           onUpdateStatus={async (uid, s) => { await supabase.from('profiles').update({ status: s }).eq('id', uid); fetchAdminData(); }}
-          onDeleteUser={async (uid) => { if(confirm("Deletar usuário?")) { await supabase.from('profiles').delete().eq('id', uid); fetchAdminData(); } }}
-          onGivePlan={async (uid, pid) => { await supabase.from('profiles').update({ active_plan_id: pid }).eq('id', uid); fetchAdminData(); }}
-          onAdjustBalance={async (uid, amt) => { await updateBalance(amt, uid); fetchAdminData(); }}
+          onDeleteUser={async (uid) => { if(confirm("CUIDADO: Deletar usuário permanentemente?")) { await supabase.from('profiles').delete().eq('id', uid); fetchAdminData(); } }}
+          onGivePlan={async (uid, pid) => { await supabase.from('profiles').update({ active_plan_id: pid }).eq('id', uid); fetchAdminData(); alert('Plano atualizado!'); }}
+          onAdjustBalance={async (uid, amt) => { await updateBalance(amt, uid); fetchAdminData(); alert('Saldo ajustado!'); }}
         /> : (currentView === AppView.REGISTER ? <Register onSwitch={() => setCurrentView(AppView.LOGIN)} onRegister={() => {}} /> : <Login onSwitch={() => setCurrentView(AppView.REGISTER)} onLogin={() => {}} />)
       )}
       

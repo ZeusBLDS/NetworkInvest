@@ -16,8 +16,8 @@ interface HomeProps {
 }
 
 const Home: React.FC<HomeProps> = ({ user, myDeposits, performCheckIn, onOpenWithdraw, onOpenDeposit, onOpenWheel }) => {
-  // Filtra contratos relevantes: o atual aprovado e qualquer um pendente
-  const myContracts = myDeposits.filter(d => d.planId && (d.status === 'PENDING' || d.status === 'APPROVED'));
+  // Filtra contratos aprovados ou pendentes
+  const myContracts = myDeposits.filter(d => d.planId && d.planId !== 'vip0' && (d.status === 'PENDING' || d.status === 'APPROVED'));
 
   return (
     <div className="p-5 space-y-6 animate-in fade-in duration-700">
@@ -49,31 +49,28 @@ const Home: React.FC<HomeProps> = ({ user, myDeposits, performCheckIn, onOpenWit
       <div className="space-y-4">
         <div className="flex items-center justify-between px-1">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Meus Contratos</h3>
-          <span className="text-[8px] bg-slate-100 text-slate-400 px-2 py-0.5 rounded-full font-bold uppercase">Total: {myContracts.length + (user.activePlanId === 'vip0' ? 1 : 0)}</span>
+          <span className="text-[8px] bg-slate-100 text-slate-400 px-2 py-0.5 rounded-full font-bold uppercase">Total: {myContracts.length + 1}</span>
         </div>
         
         <div className="space-y-3">
-          {/* VIP 0 - Cortesia Permanente ou enquanto não tem outro ativo */}
-          {user.activePlanId === 'vip0' && (
-             <div className="bg-white border border-emerald-50 p-5 rounded-[28px] flex items-center justify-between shadow-sm">
-               <div className="flex items-center space-x-4">
-                 <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-2xl shadow-inner">🌱</div>
-                 <div>
-                   <p className="text-xs font-black text-slate-800 uppercase tracking-tight">Plano VIP 0</p>
-                   <p className="text-[9px] text-emerald-500 font-black uppercase tracking-widest">Ativo & Gerando Lucro</p>
-                 </div>
-               </div>
-               <div className="text-right">
-                 <p className="text-sm font-black text-slate-800">0.10</p>
-                 <p className="text-[8px] text-slate-300 font-bold uppercase">USDT/Dia</p>
-               </div>
-             </div>
-          )}
+          {/* VIP 0 - Sempre Visível como Cortesia Permanente */}
+          <div className="bg-white border border-emerald-50 p-5 rounded-[28px] flex items-center justify-between shadow-sm">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-2xl shadow-inner">🌱</div>
+              <div>
+                <p className="text-xs font-black text-slate-800 uppercase tracking-tight">Plano VIP 0</p>
+                <p className="text-[9px] text-emerald-500 font-black uppercase tracking-widest">Ativo & Gerando Lucro</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-black text-slate-800">0.10</p>
+              <p className="text-[8px] text-slate-300 font-bold uppercase">USDT/Dia</p>
+            </div>
+          </div>
 
           {/* Outros contratos comprados */}
           {myContracts.map((contract) => {
             const planInfo = PLANS.find(p => p.id === contract.planId);
-            const isApprovedButNotActive = contract.status === 'APPROVED' && user.activePlanId !== contract.planId;
             
             return (
               <div key={contract.id} className="bg-white border border-slate-100 p-5 rounded-[28px] flex items-center justify-between shadow-sm relative overflow-hidden">

@@ -6,6 +6,12 @@ interface WelcomeModalProps {
 }
 
 const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose }) => {
+  const docs = [
+    { label: 'APRESENTAÇÃO OFICIAL (PDF)', url: 'https://www.dropbox.com/scl/fi/62z7x3pmvxo261dtw6u30/Network_Invest_PDF_Completo.pdf?rlkey=ud1fybfe5o4w2r3agnmkzg93k&st=ofi9inbd&dl=0' },
+    { label: 'TERMOS E CONDIÇÕES', url: 'https://www.dropbox.com/scl/fi/62z7x3pmvxo261dtw6u30/Network_Invest_PDF_Completo.pdf?rlkey=ud1fybfe5o4w2r3agnmkzg93k&st=ofi9inbd&dl=0' },
+    { label: 'GUIA DO INVESTIDOR', url: 'https://www.dropbox.com/scl/fi/62z7x3pmvxo261dtw6u30/Network_Invest_PDF_Completo.pdf?rlkey=ud1fybfe5o4w2r3agnmkzg93k&st=ofi9inbd&dl=0' }
+  ];
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-emerald-950/80 backdrop-blur-sm">
       <div className="bg-white rounded-3xl w-full max-w-sm p-8 relative shadow-2xl overflow-hidden animate-in zoom-in duration-300">
@@ -25,25 +31,26 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose }) => {
           </h2>
           
           <p className="text-gray-600 text-sm leading-relaxed mb-8">
-            Nossa plataforma foi criada para ajudar pessoas a buscarem oportunidades no mercado global de forma prática e acessível. 
-            Estamos felizes em ter você conosco!
+            Nossa plataforma foi criada para ajudar pessoas a buscarem oportunidades no mercado global. Explore nossos materiais oficiais abaixo:
           </p>
           
-          <button 
-            className="w-full bg-emerald-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-emerald-200 active:scale-95 transition-all mb-4"
-            onClick={() => {
-              window.open('https://www.dropbox.com/scl/fi/62z7x3pmvxo261dtw6u30/Network_Invest_PDF_Completo.pdf?rlkey=ud1fybfe5o4w2r3agnmkzg93k&st=ofi9inbd&dl=0', '_blank');
-              onClose();
-            }}
-          >
-            VER MATERIAIS OFICIAIS (PDF)
-          </button>
+          <div className="space-y-3 mb-8">
+            {docs.map((doc, idx) => (
+              <button 
+                key={idx}
+                className="w-full bg-emerald-50 text-emerald-700 font-black py-4 rounded-2xl border border-emerald-100 active:scale-95 transition-all text-[10px] uppercase tracking-widest"
+                onClick={() => window.open(doc.url, '_blank')}
+              >
+                {doc.label}
+              </button>
+            ))}
+          </div>
           
           <button 
-            className="w-full text-gray-400 font-bold py-2 text-xs"
+            className="w-full bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-200 active:scale-95 transition-all"
             onClick={onClose}
           >
-            FECHAR
+            COMEÇAR AGORA
           </button>
         </div>
       </div>
