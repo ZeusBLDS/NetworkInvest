@@ -1,11 +1,12 @@
 
-import React, { useState } from 'react';
-import { User, Notification } from '../../types';
+import React from 'react';
+import { User, Notification, DepositRequest } from '../../types';
 import DailyCheckIn from '../../components/DailyCheckIn';
 import { PLANS } from '../../constants';
 
 interface HomeProps {
   user: User;
+  myDeposits: DepositRequest[];
   updateBalance: (amount: number) => void;
   performCheckIn: () => Promise<number | undefined>;
   addNotification: (type: Notification['type'], message: string) => void;
@@ -14,129 +15,96 @@ interface HomeProps {
   onOpenWheel: () => void;
 }
 
-const Home: React.FC<HomeProps> = ({ user, updateBalance, performCheckIn, addNotification, onOpenWithdraw, onOpenDeposit, onOpenWheel }) => {
+const Home: React.FC<HomeProps> = ({ user, myDeposits, performCheckIn, addNotification, onOpenWithdraw, onOpenDeposit, onOpenWheel }) => {
   const activePlan = PLANS.find(p => p.id === user.activePlanId);
-
-  const pdfLinks = [
-    { 
-      title: 'PDF Completo', 
-      icon: '📄', 
-      url: 'https://www.dropbox.com/scl/fi/62z7x3pmvxo261dtw6u30/Network_Invest_PDF_Completo.pdf?rlkey=ud1fybfe5o4w2r3agnmkzg93k&st=ofi9inbd&dl=0' 
-    },
-    { 
-      title: 'Tabela VIP 90 Dias', 
-      icon: '📊', 
-      url: 'https://www.dropbox.com/scl/fi/sbbbbwno2nois5ssj3m0s/Network_Invest_Tabela_VIP_90_Dias.pdf?rlkey=y9p5fb0hegz2v6kcynodjf2zs&st=875rm74g&dl=0' 
-    },
-    { 
-      title: 'Ganhos com Indicação', 
-      icon: '👥', 
-      url: 'https://www.dropbox.com/scl/fi/p69zp35yw0rbx53lwikpv/Network_Invest_Ganhos_Com_Indicacao.pdf?rlkey=hjhhcunbkdtkm4fkucje6h1pb&st=99kjaqbu&dl=0' 
-    }
-  ];
-
-  // Added return statement to handleCheckIn to match the expected return type of onCheckIn prop in DailyCheckIn component
-  const handleCheckIn = async () => {
-    const reward = await performCheckIn();
-    if (reward) {
-      addNotification('EARNING_CREDITED', `Você ganhou ${reward.toFixed(2)} USDT no check-in diário!`);
-    }
-    return reward;
-  };
+  const pendingDeposit = myDeposits.find(d => d.status === 'PENDING' && d.planId);
 
   return (
     <div className="p-6 space-y-6">
-      {/* Balance Card */}
-      <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-3xl p-6 text-white shadow-xl">
-        <div className="flex justify-between items-start mb-4">
+      {/* Header com Saldo */}
+      <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-[32px] p-7 text-white shadow-xl">
+        <div className="flex justify-between items-start mb-6">
           <div>
-            <p className="text-emerald-100 text-sm font-medium uppercase tracking-widest text-[10px]">Saldo Total</p>
-            <h2 className="text-4xl font-black mt-1">
-              {user.balance.toFixed(2)} <span className="text-xl font-normal opacity-60">USDT</span>
-            </h2>
+            <p className="text-emerald-100 text-[10px] font-black uppercase tracking-widest opacity-70">Saldo Disponível</p>
+            <h2 className="text-4xl font-black mt-1">{user.balance.toFixed(2)} <span className="text-xl font-medium opacity-40">USDT</span></h2>
           </div>
-          <div className="bg-white/20 p-2 rounded-xl backdrop-blur-md">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-md border border-white/10">
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 mt-6">
-          <button 
-            onClick={onOpenDeposit}
-            className="bg-white text-emerald-700 font-black py-4 rounded-xl flex items-center justify-center space-x-2 active:scale-95 transition-all shadow-lg text-xs"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-            <span>DEPÓSITO</span>
+        <div className="grid grid-cols-2 gap-3">
+          <button onClick={onOpenDeposit} className="bg-white text-emerald-800 font-black py-4 rounded-2xl flex items-center justify-center space-x-2 active:scale-95 transition-all text-[11px] uppercase tracking-widest">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+            <span>Depositar</span>
           </button>
-          <button 
-            onClick={onOpenWithdraw}
-            className="bg-emerald-500/30 hover:bg-emerald-500/50 text-white font-black py-4 rounded-xl flex items-center justify-center space-x-2 active:scale-95 transition-all border border-white/20 text-xs"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            <span>SAQUE</span>
+          <button onClick={onOpenWithdraw} className="bg-emerald-500/30 text-white font-black py-4 rounded-2xl flex items-center justify-center space-x-2 active:scale-95 transition-all border border-white/10 text-[11px] uppercase tracking-widest">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span>Saque</span>
           </button>
         </div>
       </div>
 
-      {/* Roleta Card */}
-      <button 
-        onClick={onOpenWheel}
-        className="w-full bg-white rounded-2xl p-4 border border-emerald-100 shadow-sm flex items-center justify-between group active:scale-[0.98] transition-all"
-      >
-        <div className="flex items-center space-x-3">
-          <div className="bg-emerald-50 p-2 rounded-lg group-hover:bg-emerald-100 transition-colors">
-            <span className="text-2xl">🎰</span>
-          </div>
-          <div className="text-left">
-            <p className="text-xs text-emerald-600 font-bold uppercase tracking-wider">Bônus Extra</p>
-            <p className="font-bold text-gray-800">Roleta da Sorte</p>
-          </div>
+      {/* Alerta de Plano Pendente */}
+      {pendingDeposit && (
+        <div className="bg-amber-50 border border-amber-200 rounded-3xl p-5 flex items-center space-x-4 animate-pulse">
+           <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center text-2xl shadow-inner">⏳</div>
+           <div>
+             <p className="text-[10px] font-black text-amber-800 uppercase tracking-widest">Ativação Pendente</p>
+             <p className="text-xs font-bold text-amber-700 leading-tight">Aguardando confirmação do Admin para o plano {pendingDeposit.planId}.</p>
+           </div>
         </div>
-        <div className="bg-emerald-600 text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase">
-          Girar
-        </div>
-      </button>
+      )}
 
-      {/* Plan Status Card */}
-      <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="bg-emerald-100 p-2 rounded-lg">
-            <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-          </div>
-          <div>
-            <p className="text-[10px] text-gray-400 font-bold uppercase">Plano Ativo</p>
-            <p className="font-bold text-gray-800">{activePlan ? activePlan.name : 'Nenhum'}</p>
-          </div>
-        </div>
-        <div className="text-right">
-          <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-bold rounded-full uppercase tracking-wider">
-            Ativo
-          </span>
+      {/* Cards de Atalho */}
+      <div className="grid grid-cols-2 gap-4">
+        <button onClick={onOpenWheel} className="bg-white rounded-[28px] p-5 border border-emerald-50 shadow-sm flex flex-col items-center group active:scale-95 transition-all">
+          <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-2xl mb-3">🎰</div>
+          <p className="text-[9px] text-emerald-600 font-black uppercase tracking-widest mb-1">Giro Grátis</p>
+          <p className="font-black text-gray-800 text-xs tracking-tight">Roleta Diária</p>
+        </button>
+        
+        <div className="bg-white rounded-[28px] p-5 border border-gray-100 shadow-sm flex flex-col items-center">
+          <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center text-xl mb-3">🛡️</div>
+          <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest mb-1">Status Atual</p>
+          <p className="font-black text-gray-800 text-xs tracking-tight">{activePlan?.name || 'Iniciante'}</p>
         </div>
       </div>
 
-      {/* Check-in Card */}
-      <DailyCheckIn user={user} onCheckIn={handleCheckIn} />
+      {/* Check-in Diário */}
+      <DailyCheckIn user={user} onCheckIn={performCheckIn} />
 
-      {/* PDF Links Grid */}
+      {/* Seção de Materiais Restituidos */}
       <div className="space-y-3">
-        <h3 className="text-xs font-black text-gray-400 uppercase flex items-center px-1 tracking-widest">
-          Materiais Oficiais
-        </h3>
-        <div className="grid grid-cols-1 gap-3">
-          {pdfLinks.map((pdf, idx) => (
-            <button 
-              key={idx} 
-              onClick={() => window.open(pdf.url, '_blank')}
-              className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center justify-between hover:bg-gray-50 transition-colors shadow-sm"
-            >
-              <div className="flex items-center space-x-3">
-                <span className="text-xl">{pdf.icon}</span>
-                <span className="font-semibold text-gray-700 text-sm">{pdf.title}</span>
-              </div>
-              <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
-            </button>
-          ))}
+        <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] px-1">Materiais de Apoio</h3>
+        <div className="grid gap-3">
+          <button 
+            onClick={() => window.open('https://www.dropbox.com/scl/fi/62z7x3pmvxo261dtw6u30/Network_Invest_PDF_Completo.pdf?rlkey=ud1fybfe5o4w2r3agnmkzg93k&st=ofi9inbd&dl=0', '_blank')} 
+            className="w-full bg-white border border-gray-100 rounded-2xl p-5 flex items-center justify-between shadow-sm active:bg-gray-50 transition-colors"
+          >
+             <div className="flex items-center space-x-4">
+               <div className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center text-xl font-bold">PDF</div>
+               <div className="text-left">
+                 <p className="font-bold text-gray-800 text-xs uppercase tracking-tight">Apresentação Oficial</p>
+                 <p className="text-[9px] text-gray-400 font-bold uppercase">Plano de Negócios</p>
+               </div>
+             </div>
+             <svg className="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+          </button>
+
+          <button 
+            onClick={() => window.open('https://www.dropbox.com/scl/fi/62z7x3pmvxo261dtw6u30/Network_Invest_PDF_Completo.pdf?rlkey=ud1fybfe5o4w2r3agnmkzg93k&st=ofi9inbd&dl=0', '_blank')} 
+            className="w-full bg-white border border-gray-100 rounded-2xl p-5 flex items-center justify-between shadow-sm active:bg-gray-50 transition-colors"
+          >
+             <div className="flex items-center space-x-4">
+               <div className="w-10 h-10 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center text-xl font-bold">📖</div>
+               <div className="text-left">
+                 <p className="font-bold text-gray-800 text-xs uppercase tracking-tight">Tutorial de Uso</p>
+                 <p className="text-[9px] text-gray-400 font-bold uppercase">Passo a Passo App</p>
+               </div>
+             </div>
+             <svg className="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+          </button>
         </div>
       </div>
     </div>

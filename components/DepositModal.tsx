@@ -1,14 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
-import { APP_CONFIG } from '../constants';
 
 interface DepositModalProps {
   onClose: () => void;
   onConfirm: (hash: string) => void;
   prefilledAmount?: string;
+  wallet: string;
 }
 
-const DepositModal: React.FC<DepositModalProps> = ({ onClose, onConfirm, prefilledAmount = '' }) => {
+const DepositModal: React.FC<DepositModalProps> = ({ onClose, onConfirm, prefilledAmount = '', wallet }) => {
   const [amount, setAmount] = useState(prefilledAmount);
   const [hash, setHash] = useState('');
   const isPlanPurchase = prefilledAmount !== '';
@@ -18,7 +18,7 @@ const DepositModal: React.FC<DepositModalProps> = ({ onClose, onConfirm, prefill
   }, [prefilledAmount]);
 
   const copyWallet = () => {
-    navigator.clipboard.writeText(APP_CONFIG.DEPOSIT_WALLET);
+    navigator.clipboard.writeText(wallet);
     alert('Endereço copiado!');
   };
 
@@ -46,7 +46,7 @@ const DepositModal: React.FC<DepositModalProps> = ({ onClose, onConfirm, prefill
         <div className="bg-white p-4 rounded-[40px] shadow-2xl shadow-gray-200 border border-gray-100 mb-8">
           <div className="w-48 h-48 flex items-center justify-center bg-gray-50 rounded-3xl overflow-hidden">
             <img 
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${APP_CONFIG.DEPOSIT_WALLET}`} 
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${wallet}`} 
               alt="QR Code Depósito" 
               className="w-40 h-40"
             />
@@ -57,7 +57,7 @@ const DepositModal: React.FC<DepositModalProps> = ({ onClose, onConfirm, prefill
           <div className="bg-gray-50 rounded-3xl p-6 border border-gray-100">
             <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 px-1">Endereço USDT (BEP20)</label>
             <div className="w-full px-4 py-3 bg-white rounded-xl border border-gray-100 text-[10px] font-mono break-all mb-4 text-gray-600">
-              {APP_CONFIG.DEPOSIT_WALLET}
+              {wallet}
             </div>
             <button 
               onClick={copyWallet}
@@ -105,9 +105,6 @@ const DepositModal: React.FC<DepositModalProps> = ({ onClose, onConfirm, prefill
             >
               CONFIRMAR PAGAMENTO
             </button>
-            <p className="text-[9px] text-gray-400 text-center mt-4 uppercase font-bold tracking-tighter">
-              A ativação será processada após a verificação do administrador
-            </p>
           </div>
         </div>
       </div>
