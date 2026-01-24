@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { User } from '../types';
+import { supabase } from '../supabase';
 
 interface LuckyWheelModalProps {
   user: User;
@@ -14,8 +15,10 @@ const LuckyWheelModal: React.FC<LuckyWheelModalProps> = ({ user, onClose, onWin 
   const [result, setResult] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const prizes = [0.10, 0.20, 0.30, 0.50, 0.75, 1.00, 0.15, 0.40];
-  const weights = [25, 20, 15, 5, 2, 1, 20, 12];
+  // Prêmios significativamente menores para manter a sustentabilidade
+  const prizes = [0.01, 0.02, 0.03, 0.05, 0.10, 0.01, 0.02, 0.05];
+  // Pesos: Favoritando fortemente os prêmios de 0.01 e 0.02
+  const weights = [50, 25, 10, 5, 1, 5, 3, 1];
 
   const canSpinToday = () => {
     if (!user.lastWheelSpin) return true;
@@ -24,19 +27,21 @@ const LuckyWheelModal: React.FC<LuckyWheelModalProps> = ({ user, onClose, onWin 
     return lastSpin !== today;
   };
 
-  // VERIFICAÇÃO RIGOROSA: Somente planos VIP 1, 2, 3 ou 4 que já foram APROVADOS pelo admin podem girar.
   const hasActivePaidPlan = user.activePlanId && user.activePlanId !== 'vip0';
 
-  const handleSpin = () => {
+  const handleSpin = async () => {
     if (spinning) return;
     
-    if (!hasActivePaidPlan) {
-      setError('Atenção: A roleta é exclusiva para planos VIP 1 ou superior já ativos e aprovados pelo administrador.');
+    // Verificação de segurança no banco antes de rodar animação
+    const { data: profile } = await supabase.from('profiles').select('last_wheel_spin').eq('id', user.id).single();
+    const today = new Date().toDateString();
+    if (profile?.last_wheel_spin && new Date(profile.last_wheel_spin).toDateString() === today) {
+      setError('Atenção: Você já realizou seu giro diário hoje! Volte amanhã.');
       return;
     }
 
-    if (!canSpinToday()) {
-      setError('Você já realizou seu giro diário hoje! Volte amanhã.');
+    if (!hasActivePaidPlan) {
+      setError('A roleta é exclusiva para planos VIP 1 ou superior ativos.');
       return;
     }
 
@@ -56,7 +61,7 @@ const LuckyWheelModal: React.FC<LuckyWheelModalProps> = ({ user, onClose, onWin 
     }
 
     const sliceAngle = 360 / prizes.length;
-    const spinCount = 10;
+    const spinCount = 8;
     const sliceOffset = Math.random() * (sliceAngle * 0.8) + (sliceAngle * 0.1);
     const targetAngle = 360 - (selectedIndex * sliceAngle) - sliceOffset;
     const totalDegrees = rotation + (spinCount * 360) + (targetAngle - (rotation % 360));
@@ -116,21 +121,21 @@ const LuckyWheelModal: React.FC<LuckyWheelModalProps> = ({ user, onClose, onWin 
         
         {result !== null && (
           <div className="mb-8 animate-bounce text-center bg-emerald-50 p-4 rounded-3xl border border-emerald-100 w-full">
-            <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1">PARABÉNS!</p>
+            <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1">SORTEIO CONCLUÍDO</p>
             <p className="text-3xl font-black text-emerald-900">+{result.toFixed(2)} USDT</p>
           </div>
         )}
 
         <button 
-          disabled={spinning} 
+          disabled={spinning || (result !== null)} 
           onClick={handleSpin} 
           className={`w-full py-5 rounded-3xl font-black text-sm transition-all shadow-xl uppercase tracking-[0.2em] ${
-            spinning 
-            ? 'bg-slate-100 text-slate-300' 
+            spinning || (result !== null)
+            ? 'bg-slate-100 text-slate-300 shadow-none' 
             : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 shadow-emerald-200'
           }`}
         >
-          {spinning ? 'SORTEANDO...' : 'INICIAR GIRO'}
+          {spinning ? 'SORTEANDO...' : result !== null ? 'CONCLUÍDO' : 'INICIAR GIRO'}
         </button>
       </div>
     </div>
