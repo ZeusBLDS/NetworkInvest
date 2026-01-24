@@ -143,7 +143,6 @@ const App: React.FC = () => {
     const newBalance = currentUser.balance + reward;
 
     try {
-      // Importante: toISOString() para o Supabase aceitar como TIMESTAMPTZ
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -166,7 +165,6 @@ const App: React.FC = () => {
   const handleWheelWin = async (prize: number) => {
     if (!currentUser) return;
     try {
-      // Salva o prêmio e a data do giro
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -238,22 +236,6 @@ const App: React.FC = () => {
     );
   }
 
-  if (authError && !currentUser) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-white p-8 text-center">
-        <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center text-red-500 mb-6">
-          <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-        </div>
-        <h2 className="text-xl font-black text-gray-900 mb-2 uppercase tracking-tight">Ops! Algo deu errado</h2>
-        <div className="bg-red-50 p-4 rounded-2xl mb-8">
-           <p className="text-red-700 text-xs font-bold leading-relaxed">{authError}</p>
-        </div>
-        <button onClick={() => window.location.reload()} className="w-full bg-emerald-600 text-white font-black py-5 rounded-2xl shadow-xl shadow-emerald-100 active:scale-95 transition-all mb-4 uppercase tracking-widest text-sm">TENTAR NOVAMENTE</button>
-        <button onClick={handleLogout} className="text-gray-400 font-bold text-[10px] uppercase tracking-widest hover:text-emerald-600 transition-colors">VOLTAR PARA LOGIN</button>
-      </div>
-    );
-  }
-
   const renderContent = () => {
     if (!currentUser) {
       if (currentView === AppView.REGISTER) return <Register onSwitch={() => setCurrentView(AppView.LOGIN)} onRegister={() => {}} />;
@@ -268,7 +250,7 @@ const App: React.FC = () => {
       case AppView.NETWORK:
         return <NetworkView user={currentUser} />;
       case AppView.ACCOUNT:
-        return <Account user={currentUser} onLogout={handleLogout} notifications={notifications} onUpdateUser={async (u) => { await supabase.from('profiles').update({ wallet_address: u.walletAddress, name: u.name, phone: u.phone }).eq('id', u.id); fetchUserProfile(u.id); }} />;
+        return <Account user={currentUser} onLogout={handleLogout} notifications={notifications} onViewChange={setCurrentView} onUpdateUser={async (u) => { await supabase.from('profiles').update({ wallet_address: u.walletAddress, name: u.name, phone: u.phone }).eq('id', u.id); fetchUserProfile(u.id); }} />;
       case AppView.ADMIN:
         return <AdminPanel users={allUsers} deposits={deposits} withdrawals={withdrawals} onClose={() => setCurrentView(AppView.ACCOUNT)} onApproveDeposit={async (id) => { const req = deposits.find(d => d.id === id); if (req) { await supabase.from('deposits').update({ status: 'APPROVED' }).eq('id', id); const u = allUsers.find(user => user.id === req.userId); if (u) await supabase.from('profiles').update({ balance: u.balance + (req.planId ? 0 : req.amount), active_plan_id: req.planId || u.activePlanId, total_invested: (u.totalInvested || 0) + req.amount }).eq('id', req.userId); fetchAdminData(); } }} onRejectDeposit={async (id) => { await supabase.from('deposits').update({ status: 'REJECTED' }).eq('id', id); fetchAdminData(); }} onApproveWithdraw={async (id) => { await supabase.from('withdrawals').update({ status: 'APPROVED' }).eq('id', id); fetchAdminData(); }} onRejectWithdraw={async (id) => { const req = withdrawals.find(w => w.id === id); if(req) await updateBalance(req.amount, req.userId); await supabase.from('withdrawals').update({ status: 'REJECTED' }).eq('id', id); fetchAdminData(); }} onUpdateStatus={async (id, s) => { await supabase.from('profiles').update({ status: s }).eq('id', id); fetchAdminData(); }} onDeleteUser={async (id) => { await supabase.from('profiles').delete().eq('id', id); fetchAdminData(); }} onGivePlan={async (id, p) => { await supabase.from('profiles').update({ active_plan_id: p }).eq('id', id); fetchAdminData(); }} onAdjustBalance={async (id, a) => { await updateBalance(a, id); fetchAdminData(); }} />;
       default:
@@ -278,7 +260,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col max-w-md mx-auto relative overflow-x-hidden shadow-2xl">
-      {currentUser ? (
+      {currentUser && currentView !== AppView.ADMIN ? (
         <Layout currentView={currentView} onViewChange={setCurrentView}>
           {renderContent()}
         </Layout>

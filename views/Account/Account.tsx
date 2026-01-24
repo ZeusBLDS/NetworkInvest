@@ -7,10 +7,11 @@ interface AccountProps {
   user: User;
   onLogout: () => void;
   onUpdateUser: (u: User) => void;
+  onViewChange: (view: AppView) => void;
   notifications: Notification[];
 }
 
-const Account: React.FC<AccountProps> = ({ user, onLogout, notifications, onUpdateUser }) => {
+const Account: React.FC<AccountProps> = ({ user, onLogout, notifications, onUpdateUser, onViewChange }) => {
   const [wallet, setWallet] = useState(user.walletAddress || '');
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -50,6 +51,23 @@ const Account: React.FC<AccountProps> = ({ user, onLogout, notifications, onUpda
             ))
           )}
         </div>
+      )}
+
+      {/* Admin Quick Access */}
+      {user.role === 'ADMIN' && (
+        <button 
+          onClick={() => onViewChange(AppView.ADMIN)}
+          className="w-full bg-gradient-to-r from-amber-500 to-amber-700 p-4 rounded-2xl text-white flex items-center justify-between shadow-lg shadow-amber-100 active:scale-[0.98] transition-all"
+        >
+          <div className="flex items-center space-x-3">
+            <span className="text-2xl">🔐</span>
+            <div className="text-left">
+              <p className="text-[10px] font-black uppercase opacity-80">Acesso Restrito</p>
+              <p className="font-bold">Painel Administrativo</p>
+            </div>
+          </div>
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+        </button>
       )}
 
       {/* User Info */}
