@@ -35,11 +35,13 @@ const Home: React.FC<HomeProps> = ({ user, updateBalance, performCheckIn, addNot
     }
   ];
 
+  // Added return statement to handleCheckIn to match the expected return type of onCheckIn prop in DailyCheckIn component
   const handleCheckIn = async () => {
     const reward = await performCheckIn();
     if (reward) {
       addNotification('EARNING_CREDITED', `Você ganhou ${reward.toFixed(2)} USDT no check-in diário!`);
     }
+    return reward;
   };
 
   return (
