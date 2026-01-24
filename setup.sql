@@ -1,20 +1,5 @@
 
--- GARANTINDO COLUNAS DE REDE (Caso já existam tabelas)
-DO $$ 
-BEGIN 
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='network_earnings') THEN
-        ALTER TABLE public.profiles ADD COLUMN network_earnings DECIMAL(12,2) DEFAULT 0;
-    END IF;
-END $$;
-
--- 1. LIMPEZA TOTAL (OPCIONAL - USAR APENAS SE QUISER RESETAR TUDO)
--- DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
--- DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
--- DROP TABLE IF EXISTS public.deposits CASCADE;
--- DROP TABLE IF EXISTS public.withdrawals CASCADE;
--- DROP TABLE IF EXISTS public.profiles CASCADE;
-
--- 2. CRIAÇÃO DA TABELA DE PERFIS (ESTRUTURA COMPLETA)
+-- 1. TABELA DE PERFIS (GARANTIR ESTRUTURA)
 CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
   name TEXT,
@@ -37,31 +22,18 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 3. TABELA DE DEPÓSITOS
-CREATE TABLE IF NOT EXISTS public.deposits (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-  user_name TEXT,
-  amount DECIMAL(12,2) NOT NULL,
-  hash TEXT NOT NULL,
-  plan_id TEXT,
-  status TEXT DEFAULT 'PENDING',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- 2. HABILITAR RLS E CRIAR POLÍTICAS DE BACKUP
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
--- 4. TABELA DE SAQUES
-CREATE TABLE IF NOT EXISTS public.withdrawals (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-  user_name TEXT,
-  amount DECIMAL(12,2) NOT NULL,
-  wallet TEXT NOT NULL,
-  fee DECIMAL(12,2) DEFAULT 0,
-  status TEXT DEFAULT 'PENDING',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- Permitir que o usuário insira seu próprio perfil (Caso o trigger falhe)
+DO $$ 
+BEGIN 
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can insert their own profile') THEN
+        CREATE POLICY "Users can insert their own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
+    END IF;
+END $$;
 
--- 5. TRIGGER DE CRIAÇÃO AUTOMÁTICA DE PERFIL
+-- 3. FUNÇÃO DE TRIGGER MELHORADA
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -73,11 +45,13 @@ BEGIN
     COALESCE(NEW.raw_user_meta_data->>'phone', ''),
     COALESCE(NEW.raw_user_meta_data->>'referred_by', 'Direto'),
     upper(substring(replace(gen_random_uuid()::text, '-', '') from 1 for 8))
-  );
+  )
+  ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- 4. RE-VINCULAR TRIGGER
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users

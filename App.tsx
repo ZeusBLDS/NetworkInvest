@@ -35,17 +35,6 @@ const App: React.FC = () => {
   const [showWheel, setShowWheel] = useState(false);
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
 
-  // Segurança: Forçar fim do carregamento após 8 segundos para evitar travamento visual
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (loading) {
-        console.warn("Carregamento forçado a encerrar por timeout.");
-        setLoading(false);
-      }
-    }, 8000);
-    return () => clearTimeout(timer);
-  }, [loading]);
-
   const mapUserFromDB = (u: any): User => ({
     id: u.id,
     name: u.name || 'Usuário',
@@ -63,34 +52,8 @@ const App: React.FC = () => {
     status: u.status || 'ACTIVE',
     totalInvested: parseFloat(u.total_invested || 0),
     totalWithdrawn: parseFloat(u.total_withdrawn || 0),
-    lastCheckIn: u.last_check_in ? new Date(u.last_check_in).getTime() : undefined,
-    lastWheelSpin: u.last_wheel_spin ? new Date(u.last_wheel_spin).getTime() : undefined,
     network_earnings: parseFloat(u.network_earnings || 0)
   });
-
-  const fetchAdminData = async () => {
-    try {
-      const [{ data: profiles }, { data: deps }, { data: withs }] = await Promise.all([
-        supabase.from('profiles').select('*').order('created_at', { ascending: false }),
-        supabase.from('deposits').select('*').order('created_at', { ascending: false }),
-        supabase.from('withdrawals').select('*').order('created_at', { ascending: false })
-      ]);
-      
-      if (profiles) setAllUsers(profiles.map(mapUserFromDB));
-      if (deps) setDeposits(deps.map((req: any) => ({
-        id: req.id, userId: req.user_id, userName: req.user_name,
-        amount: parseFloat(req.amount), hash: req.hash, planId: req.plan_id,
-        status: req.status, timestamp: new Date(req.created_at).getTime(), method: 'USDT'
-      })));
-      if (withs) setWithdrawals(withs.map((req: any) => ({
-        id: req.id, userId: req.user_id, userName: req.user_name,
-        amount: parseFloat(req.amount), wallet: req.wallet, fee: parseFloat(req.fee || 0),
-        status: req.status, timestamp: new Date(req.created_at).getTime()
-      })));
-    } catch (e) {
-      console.error("Admin Load Error:", e);
-    }
-  };
 
   const fetchUserProfile = async (userId: string, retryCount = 0) => {
     try {
@@ -108,7 +71,6 @@ const App: React.FC = () => {
         })));
 
         if (user.role === 'ADMIN') await fetchAdminData();
-        
         if (user.isFirstLogin) {
           setShowWelcome(true);
           setShowVipZero(true);
@@ -119,24 +81,54 @@ const App: React.FC = () => {
           setCurrentView(AppView.HOME);
         }
         setLoading(false);
-      } else if (retryCount < 5) {
-        // Se não achou o perfil, tenta de novo (esperando o trigger do Supabase)
+      } else if (retryCount < 3) {
         setTimeout(() => fetchUserProfile(userId, retryCount + 1), 2000);
       } else {
-        // Falhou após tentativas, provavelmente o perfil não existe
-        console.error("Perfil não encontrado após várias tentativas.");
-        setLoading(false);
-        supabase.auth.signOut(); // Desloga para evitar loop
+        // CRIAÇÃO MANUAL DE PERFIL (CASO O TRIGGER DO SUPABASE FALHE)
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser) {
+          const { error: insertError } = await supabase.from('profiles').insert({
+            id: authUser.id,
+            name: authUser.user_metadata.name || 'Usuário',
+            email: authUser.email,
+            phone: authUser.user_metadata.phone || '',
+            referred_by: authUser.user_metadata.referred_by || 'Direto',
+            referral_code: Math.random().toString(36).substring(2, 10).toUpperCase()
+          });
+          if (!insertError) fetchUserProfile(userId);
+          else { setLoading(false); supabase.auth.signOut(); }
+        }
       }
     } catch (e) { 
-      console.error("Erro fatal ao buscar perfil:", e);
       setLoading(false); 
     }
+  };
+
+  const fetchAdminData = async () => {
+    try {
+      const [{ data: profiles }, { data: deps }, { data: withs }] = await Promise.all([
+        supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+        supabase.from('deposits').select('*').order('created_at', { ascending: false }),
+        supabase.from('withdrawals').select('*').order('created_at', { ascending: false })
+      ]);
+      if (profiles) setAllUsers(profiles.map(mapUserFromDB));
+      if (deps) setDeposits(deps.map((req: any) => ({
+        id: req.id, userId: req.user_id, userName: req.user_name,
+        amount: parseFloat(req.amount), hash: req.hash, planId: req.plan_id,
+        status: req.status, timestamp: new Date(req.created_at).getTime(), method: 'USDT'
+      })));
+      if (withs) setWithdrawals(withs.map((req: any) => ({
+        id: req.id, userId: req.user_id, userName: req.user_name,
+        amount: parseFloat(req.amount), wallet: req.wallet, fee: parseFloat(req.fee || 0),
+        status: req.status, timestamp: new Date(req.created_at).getTime()
+      })));
+    } catch (e) { console.error(e); }
   };
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
+        setLoading(true);
         fetchUserProfile(session.user.id);
       } else {
         setCurrentUser(null);
@@ -144,33 +136,21 @@ const App: React.FC = () => {
         setCurrentView(AppView.LOGIN);
       }
     });
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) fetchUserProfile(session.user.id);
-      else setLoading(false);
-    });
-
     return () => subscription.unsubscribe();
   }, []);
 
   const distributeNetworkCommissions = async (userId: string, planAmount: number) => {
     let currentId = userId;
     for (let level = 0; level < REFERRAL_RATES.length; level++) {
-      const { data: profile } = await supabase.from('profiles').select('referred_by').eq('id', currentId).single();
-      if (!profile || profile.referred_by === 'Direto') break;
-
-      const { data: referrer } = await supabase.from('profiles').select('*').eq('referral_code', profile.referred_by).single();
+      const { data: p } = await supabase.from('profiles').select('referred_by').eq('id', currentId).single();
+      if (!p || p.referred_by === 'Direto') break;
+      const { data: referrer } = await supabase.from('profiles').select('*').eq('referral_code', p.referred_by).single();
       if (!referrer) break;
-
       const commission = planAmount * REFERRAL_RATES[level];
-      const newBalance = (parseFloat(referrer.balance) || 0) + commission;
-      const newEarnings = (parseFloat(referrer.network_earnings) || 0) + commission;
-
       await supabase.from('profiles').update({ 
-        balance: newBalance, 
-        network_earnings: newEarnings 
+        balance: (parseFloat(referrer.balance) || 0) + commission, 
+        network_earnings: (parseFloat(referrer.network_earnings) || 0) + commission 
       }).eq('id', referrer.id);
-
       currentId = referrer.id;
     }
   };
@@ -189,15 +169,10 @@ const App: React.FC = () => {
     if (!currentUser) return;
     const now = new Date();
     if (currentUser.lastCheckIn && new Date(currentUser.lastCheckIn).toDateString() === now.toDateString()) {
-      alert('Check-in já realizado hoje!');
-      return;
+      alert('Check-in já realizado hoje!'); return;
     }
     const reward = (currentUser.checkInStreak + 1) * 0.01;
-    await supabase.from('profiles').update({ 
-      balance: currentUser.balance + reward, 
-      last_check_in: now.toISOString(), 
-      check_in_streak: currentUser.checkInStreak + 1 
-    }).eq('id', currentUser.id);
+    await supabase.from('profiles').update({ balance: currentUser.balance + reward, last_check_in: now.toISOString(), check_in_streak: currentUser.checkInStreak + 1 }).eq('id', currentUser.id);
     fetchUserProfile(currentUser.id);
     return reward;
   };
@@ -206,13 +181,7 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-8 text-center">
       <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-6"></div>
       <h2 className="text-xl font-black text-white italic tracking-tighter uppercase">Iniciando Network Invest...</h2>
-      <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-[0.4em] mt-2 animate-pulse">Sincronizando Dados com o Mercado</p>
-      <button 
-        onClick={() => { setLoading(false); supabase.auth.signOut(); }}
-        className="mt-12 text-[9px] text-white/30 font-black uppercase tracking-widest hover:text-white transition-colors"
-      >
-        Cancelar Carregamento
-      </button>
+      <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-[0.4em] mt-2 animate-pulse">Sincronizando Perfil</p>
     </div>
   );
 
@@ -230,28 +199,23 @@ const App: React.FC = () => {
           users={allUsers} deposits={deposits} withdrawals={withdrawals} onClose={() => setCurrentView(AppView.HOME)} 
           depositWallet={customWallet} onUpdateWallet={setCustomWallet}
           onApproveDeposit={async (id) => {
-            const req = deposits.find(d => d.id === id);
-            if (!req) return;
+            const req = deposits.find(d => d.id === id); if (!req) return;
             await supabase.from('deposits').update({ status: 'APPROVED' }).eq('id', id);
             const { data: uDB } = await supabase.from('profiles').select('*').eq('id', req.userId).single();
             if (uDB) {
               const updates: any = { total_invested: (parseFloat(uDB.total_invested) || 0) + req.amount };
-              if (req.planId) {
-                updates.active_plan_id = req.planId;
-                await distributeNetworkCommissions(req.userId, req.amount);
-              } else {
-                updates.balance = (parseFloat(uDB.balance) || 0) + req.amount;
-              }
+              if (req.planId) { updates.active_plan_id = req.planId; await distributeNetworkCommissions(req.userId, req.amount); }
+              else { updates.balance = (parseFloat(uDB.balance) || 0) + req.amount; }
               await supabase.from('profiles').update(updates).eq('id', req.userId);
               fetchAdminData();
-              alert("Plano Aprovado com Sucesso!");
+              alert('Plano ativado com sucesso!');
             }
           }}
           onRejectDeposit={async (id) => { await supabase.from('deposits').update({ status: 'REJECTED' }).eq('id', id); fetchAdminData(); }}
           onApproveWithdraw={async (id) => { await supabase.from('withdrawals').update({ status: 'APPROVED' }).eq('id', id); fetchAdminData(); }}
           onRejectWithdraw={async (id) => { const req = withdrawals.find(w => w.id === id); if(req) await updateBalance(req.amount, req.userId); await supabase.from('withdrawals').update({ status: 'REJECTED' }).eq('id', id); fetchAdminData(); }}
           onUpdateStatus={async (uid, s) => { await supabase.from('profiles').update({ status: s }).eq('id', uid); fetchAdminData(); }}
-          onDeleteUser={async (uid) => { if(confirm("Deseja deletar este usuário permanentemente?")) { await supabase.from('profiles').delete().eq('id', uid); fetchAdminData(); } }}
+          onDeleteUser={async (uid) => { if(confirm("Deletar usuário?")) { await supabase.from('profiles').delete().eq('id', uid); fetchAdminData(); } }}
           onGivePlan={async (uid, pid) => { await supabase.from('profiles').update({ active_plan_id: pid }).eq('id', uid); fetchAdminData(); }}
           onAdjustBalance={async (uid, amt) => { await updateBalance(amt, uid); fetchAdminData(); }}
         /> : (currentView === AppView.REGISTER ? <Register onSwitch={() => setCurrentView(AppView.LOGIN)} onRegister={() => {}} /> : <Login onSwitch={() => setCurrentView(AppView.REGISTER)} onLogin={() => {}} />)
