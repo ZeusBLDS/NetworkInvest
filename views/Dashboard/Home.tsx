@@ -7,13 +7,14 @@ import { PLANS } from '../../constants';
 interface HomeProps {
   user: User;
   updateBalance: (amount: number) => void;
+  performCheckIn: () => Promise<number | undefined>;
   addNotification: (type: Notification['type'], message: string) => void;
   onOpenWithdraw: () => void;
   onOpenDeposit: () => void;
   onOpenWheel: () => void;
 }
 
-const Home: React.FC<HomeProps> = ({ user, updateBalance, addNotification, onOpenWithdraw, onOpenDeposit, onOpenWheel }) => {
+const Home: React.FC<HomeProps> = ({ user, updateBalance, performCheckIn, addNotification, onOpenWithdraw, onOpenDeposit, onOpenWheel }) => {
   const activePlan = PLANS.find(p => p.id === user.activePlanId);
 
   const pdfLinks = [
@@ -34,15 +35,22 @@ const Home: React.FC<HomeProps> = ({ user, updateBalance, addNotification, onOpe
     }
   ];
 
+  const handleCheckIn = async () => {
+    const reward = await performCheckIn();
+    if (reward) {
+      addNotification('EARNING_CREDITED', `Você ganhou ${reward.toFixed(2)} USDT no check-in diário!`);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Balance Card */}
       <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-3xl p-6 text-white shadow-xl">
         <div className="flex justify-between items-start mb-4">
           <div>
-            <p className="text-emerald-100 text-sm font-medium">Saldo Total</p>
-            <h2 className="text-4xl font-bold mt-1">
-              {user.balance.toFixed(2)} <span className="text-xl font-normal opacity-80">USDT</span>
+            <p className="text-emerald-100 text-sm font-medium uppercase tracking-widest text-[10px]">Saldo Total</p>
+            <h2 className="text-4xl font-black mt-1">
+              {user.balance.toFixed(2)} <span className="text-xl font-normal opacity-60">USDT</span>
             </h2>
           </div>
           <div className="bg-white/20 p-2 rounded-xl backdrop-blur-md">
@@ -53,14 +61,14 @@ const Home: React.FC<HomeProps> = ({ user, updateBalance, addNotification, onOpe
         <div className="grid grid-cols-2 gap-3 mt-6">
           <button 
             onClick={onOpenDeposit}
-            className="bg-white text-emerald-700 font-bold py-3 rounded-xl flex items-center justify-center space-x-2 active:scale-95 transition-all"
+            className="bg-white text-emerald-700 font-black py-4 rounded-xl flex items-center justify-center space-x-2 active:scale-95 transition-all shadow-lg text-xs"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
             <span>DEPÓSITO</span>
           </button>
           <button 
             onClick={onOpenWithdraw}
-            className="bg-emerald-500/30 hover:bg-emerald-500/50 text-white font-bold py-3 rounded-xl flex items-center justify-center space-x-2 active:scale-95 transition-all border border-white/30"
+            className="bg-emerald-500/30 hover:bg-emerald-500/50 text-white font-black py-4 rounded-xl flex items-center justify-center space-x-2 active:scale-95 transition-all border border-white/20 text-xs"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             <span>SAQUE</span>
@@ -94,7 +102,7 @@ const Home: React.FC<HomeProps> = ({ user, updateBalance, addNotification, onOpe
             <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
           </div>
           <div>
-            <p className="text-xs text-gray-400 font-medium">Plano Ativo</p>
+            <p className="text-[10px] text-gray-400 font-bold uppercase">Plano Ativo</p>
             <p className="font-bold text-gray-800">{activePlan ? activePlan.name : 'Nenhum'}</p>
           </div>
         </div>
@@ -106,14 +114,11 @@ const Home: React.FC<HomeProps> = ({ user, updateBalance, addNotification, onOpe
       </div>
 
       {/* Check-in Card */}
-      <DailyCheckIn user={user} onCheckIn={(val) => {
-        updateBalance(val);
-        addNotification('EARNING_CREDITED', `Você ganhou ${val} USDT no check-in diário!`);
-      }} />
+      <DailyCheckIn user={user} onCheckIn={handleCheckIn} />
 
       {/* PDF Links Grid */}
       <div className="space-y-3">
-        <h3 className="text-sm font-bold text-gray-800 flex items-center px-1">
+        <h3 className="text-xs font-black text-gray-400 uppercase flex items-center px-1 tracking-widest">
           Materiais Oficiais
         </h3>
         <div className="grid grid-cols-1 gap-3">
@@ -125,7 +130,7 @@ const Home: React.FC<HomeProps> = ({ user, updateBalance, addNotification, onOpe
             >
               <div className="flex items-center space-x-3">
                 <span className="text-xl">{pdf.icon}</span>
-                <span className="font-semibold text-gray-700">{pdf.title}</span>
+                <span className="font-semibold text-gray-700 text-sm">{pdf.title}</span>
               </div>
               <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
             </button>

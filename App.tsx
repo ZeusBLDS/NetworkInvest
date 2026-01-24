@@ -38,13 +38,11 @@ const App: React.FC = () => {
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Verificar sessão inicial
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) fetchUserProfile(session.user.id);
       else setLoading(false);
     });
 
-    // Escutar mudanças na autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
         fetchUserProfile(session.user.id);
@@ -65,14 +63,9 @@ const App: React.FC = () => {
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .maybeSingle(); // maybeSingle é mais seguro que single() para evitar erros 406
+        .maybeSingle();
 
-      if (error) {
-        if (error.message.includes('recursion')) {
-          throw new Error("Erro de permissão no Banco de Dados. Por favor, rode o script SQL de correção.");
-        }
-        throw error;
-      }
+      if (error) throw error;
 
       if (data) {
         const user = data as any;
@@ -94,8 +87,8 @@ const App: React.FC = () => {
           status: user.status || 'ACTIVE',
           totalInvested: parseFloat(user.total_invested || 0),
           totalWithdrawn: parseFloat(user.total_withdrawn || 0),
-          lastCheckIn: user.last_check_in,
-          lastWheelSpin: user.last_wheel_spin
+          lastCheckIn: user.last_check_in ? parseInt(user.last_check_in) : undefined,
+          lastWheelSpin: user.last_wheel_spin ? parseInt(user.last_wheel_spin) : undefined
         };
 
         setCurrentUser(normalizedUser);
@@ -110,18 +103,62 @@ const App: React.FC = () => {
         setCurrentView(AppView.HOME);
         setLoading(false);
       } else {
-        // Se não achou o perfil, tenta criar ou avisa
         if (retryCount < 2) {
           setTimeout(() => fetchUserProfile(userId, retryCount + 1), 2000);
         } else {
-          setAuthError("Perfil não encontrado. O administrador precisa rodar o script SQL de correção.");
+          setAuthError("Perfil não encontrado. Verifique se as tabelas foram criadas no Supabase.");
           setLoading(false);
         }
       }
     } catch (err: any) {
-      console.error("Erro no Perfil:", err.message);
       setAuthError(err.message);
       setLoading(false);
+    }
+  };
+
+  const performCheckIn = async () => {
+    if (!currentUser) return;
+
+    const now = Date.now();
+    const today = new Date().toDateString();
+    const lastCheckInDate = currentUser.lastCheckIn ? new Date(currentUser.lastCheckIn).toDateString() : '';
+
+    if (today === lastCheckInDate) {
+      alert('Você já realizou o check-in hoje!');
+      return;
+    }
+
+    // Lógica de Streak (sequência)
+    let newStreak = 1;
+    if (currentUser.lastCheckIn) {
+      const lastCheckInDateObj = new Date(currentUser.lastCheckIn);
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      if (lastCheckInDateObj.toDateString() === yesterday.toDateString()) {
+        newStreak = (currentUser.checkInStreak % 30) + 1;
+      }
+    }
+
+    const reward = newStreak * 0.01;
+    const newBalance = currentUser.balance + reward;
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          balance: newBalance,
+          last_check_in: now,
+          check_in_streak: newStreak
+        })
+        .eq('id', currentUser.id);
+
+      if (error) throw error;
+
+      fetchUserProfile(currentUser.id);
+      return reward;
+    } catch (err: any) {
+      alert('Erro ao processar check-in: ' + err.message);
     }
   };
 
@@ -161,7 +198,7 @@ const App: React.FC = () => {
   const handleLogout = async () => {
     setLoading(true);
     await supabase.auth.signOut();
-    window.location.reload(); // Recarregar para limpar estados
+    window.location.reload();
   };
 
   const updateBalance = async (amount: number, userId?: string) => {
@@ -184,25 +221,15 @@ const App: React.FC = () => {
   if (authError && !currentUser) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-white p-8 text-center">
-        <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center text-red-500 mb-6 animate-bounce">
+        <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center text-red-500 mb-6">
           <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
         </div>
         <h2 className="text-xl font-black text-gray-900 mb-2 uppercase tracking-tight">Ops! Algo deu errado</h2>
         <div className="bg-red-50 p-4 rounded-2xl mb-8">
            <p className="text-red-700 text-xs font-bold leading-relaxed">{authError}</p>
         </div>
-        <button 
-          onClick={() => window.location.reload()}
-          className="w-full bg-emerald-600 text-white font-black py-5 rounded-2xl shadow-xl shadow-emerald-100 active:scale-95 transition-all mb-4 uppercase tracking-widest text-sm"
-        >
-          TENTAR NOVAMENTE
-        </button>
-        <button 
-          onClick={handleLogout}
-          className="text-gray-400 font-bold text-[10px] uppercase tracking-widest hover:text-emerald-600 transition-colors"
-        >
-          VOLTAR PARA LOGIN
-        </button>
+        <button onClick={() => window.location.reload()} className="w-full bg-emerald-600 text-white font-black py-5 rounded-2xl shadow-xl shadow-emerald-100 active:scale-95 transition-all mb-4 uppercase tracking-widest text-sm">TENTAR NOVAMENTE</button>
+        <button onClick={handleLogout} className="text-gray-400 font-bold text-[10px] uppercase tracking-widest hover:text-emerald-600 transition-colors">VOLTAR PARA LOGIN</button>
       </div>
     );
   }
@@ -215,7 +242,7 @@ const App: React.FC = () => {
 
     switch (currentView) {
       case AppView.HOME:
-        return <Home user={currentUser} updateBalance={updateBalance} addNotification={() => {}} onOpenWithdraw={() => setShowWithdraw(true)} onOpenDeposit={() => { setPendingPlanId(null); setShowDeposit(true); }} onOpenWheel={() => setShowWheel(true)} />;
+        return <Home user={currentUser} updateBalance={updateBalance} performCheckIn={performCheckIn} addNotification={() => {}} onOpenWithdraw={() => setShowWithdraw(true)} onOpenDeposit={() => { setPendingPlanId(null); setShowDeposit(true); }} onOpenWheel={() => setShowWheel(true)} />;
       case AppView.PLANS:
         return <PlanList user={currentUser} onActivate={(planId) => { if (planId === 'vip0') alert('Plano já ativo!'); else { setPendingPlanId(planId); setShowDeposit(true); } }} />;
       case AppView.NETWORK:
@@ -225,7 +252,7 @@ const App: React.FC = () => {
       case AppView.ADMIN:
         return <AdminPanel users={allUsers} deposits={deposits} withdrawals={withdrawals} onClose={() => setCurrentView(AppView.ACCOUNT)} onApproveDeposit={async (id) => { const req = deposits.find(d => d.id === id); if (req) { await supabase.from('deposits').update({ status: 'APPROVED' }).eq('id', id); const u = allUsers.find(user => user.id === req.userId); if (u) await supabase.from('profiles').update({ balance: u.balance + (req.planId ? 0 : req.amount), active_plan_id: req.planId || u.activePlanId, total_invested: (u.totalInvested || 0) + req.amount }).eq('id', req.userId); fetchAdminData(); } }} onRejectDeposit={async (id) => { await supabase.from('deposits').update({ status: 'REJECTED' }).eq('id', id); fetchAdminData(); }} onApproveWithdraw={async (id) => { await supabase.from('withdrawals').update({ status: 'APPROVED' }).eq('id', id); fetchAdminData(); }} onRejectWithdraw={async (id) => { const req = withdrawals.find(w => w.id === id); if(req) await updateBalance(req.amount, req.userId); await supabase.from('withdrawals').update({ status: 'REJECTED' }).eq('id', id); fetchAdminData(); }} onUpdateStatus={async (id, s) => { await supabase.from('profiles').update({ status: s }).eq('id', id); fetchAdminData(); }} onDeleteUser={async (id) => { await supabase.from('profiles').delete().eq('id', id); fetchAdminData(); }} onGivePlan={async (id, p) => { await supabase.from('profiles').update({ active_plan_id: p }).eq('id', id); fetchAdminData(); }} onAdjustBalance={async (id, a) => { await updateBalance(a, id); fetchAdminData(); }} />;
       default:
-        return <Home user={currentUser} updateBalance={updateBalance} addNotification={() => {}} onOpenWithdraw={() => setShowWithdraw(true)} onOpenDeposit={() => {}} onOpenWheel={() => {}} />;
+        return <Home user={currentUser} updateBalance={updateBalance} performCheckIn={performCheckIn} addNotification={() => {}} onOpenWithdraw={() => setShowWithdraw(true)} onOpenDeposit={() => {}} onOpenWheel={() => {}} />;
     }
   };
 
