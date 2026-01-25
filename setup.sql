@@ -22,6 +22,10 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- ADIÇÃO DE ÍNDICES PARA PERFORMANCE DA REDE
+CREATE INDEX IF NOT EXISTS idx_profiles_referral_code ON public.profiles(referral_code);
+CREATE INDEX IF NOT EXISTS idx_profiles_referred_by ON public.profiles(referred_by);
+
 -- 2. TABELA DE TAREFAS
 CREATE TABLE IF NOT EXISTS public.user_tasks (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -43,7 +47,7 @@ CREATE TABLE IF NOT EXISTS public.deposits (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 4. TABELA DE SAQUES (ESSENCIAL PARA O ADMIN VER)
+-- 4. TABELA DE SAQUES
 CREATE TABLE IF NOT EXISTS public.withdrawals (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
