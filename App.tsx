@@ -21,6 +21,7 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.LOGIN);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
   const [customWallet, setCustomWallet] = useState(APP_CONFIG.DEPOSIT_WALLET);
   
   const [allUsers, setAllUsers] = useState<User[]>([]);
@@ -58,19 +59,22 @@ const App: React.FC = () => {
 
   const fetchUserProfile = async (userId: string) => {
     try {
+      console.log("Buscando perfil para:", userId);
       let { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
       
-      // Se não encontrar o perfil, tenta criar um (Corrige a tela branca)
       if (!data && !error) {
+        console.log("Perfil não encontrado, tentando criar...");
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          const { data: newProfile } = await supabase.from('profiles').insert({
+          const { data: newProfile, error: insertError } = await supabase.from('profiles').insert({
             id: user.id,
             email: user.email,
-            name: user.user_metadata.name || 'Usuário',
+            name: user.user_metadata?.name || 'Novo Usuário',
             referral_code: Math.random().toString(36).substring(2, 8).toUpperCase(),
-            referred_by: user.user_metadata.referred_by || 'Direto'
+            referred_by: user.user_metadata?.referred_by || 'Direto'
           }).select().single();
+          
+          if (insertError) throw insertError;
           data = newProfile;
         }
       }
@@ -95,11 +99,15 @@ const App: React.FC = () => {
         if (currentView === AppView.LOGIN || currentView === AppView.REGISTER) {
           setCurrentView(AppView.HOME);
         }
+      } else {
+        // Se chegamos aqui, algo deu muito errado na busca/criação
+        console.error("Falha crítica ao obter dados do perfil.");
       }
     } catch (e) {
       console.error("Erro ao carregar perfil:", e);
     } finally {
       setLoading(false);
+      setAuthChecked(true);
     }
   };
 
@@ -125,11 +133,13 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
+    // Check initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         fetchUserProfile(session.user.id);
       } else {
         setLoading(false);
+        setAuthChecked(true);
       }
     });
 
@@ -140,6 +150,7 @@ const App: React.FC = () => {
       } else {
         setCurrentUser(null);
         setLoading(false);
+        setAuthChecked(true);
         setCurrentView(AppView.LOGIN);
       }
     });
@@ -159,11 +170,8 @@ const App: React.FC = () => {
 
   const performCheckIn = async () => {
     if (!currentUser) return;
-    
-    // Pegar data atual do sistema (ignorando horas para comparar o dia)
     const now = new Date();
-    const today = now.toISOString().split('T')[0]; // Formato YYYY-MM-DD
-    
+    const today = now.toISOString().split('T')[0];
     const { data: profile } = await supabase.from('profiles').select('last_check_in, check_in_streak, balance').eq('id', currentUser.id).single();
     
     if (profile?.last_check_in) {
@@ -190,15 +198,9 @@ const App: React.FC = () => {
   const handleApproveDeposit = async (id: string) => {
     const dep = deposits.find(d => d.id === id);
     if (!dep) return;
-
     await supabase.from('deposits').update({ status: 'APPROVED' }).eq('id', id);
-    
     if (dep.planId) {
-      await supabase.from('profiles').update({ 
-        active_plan_id: dep.planId, 
-        total_invested: dep.amount 
-      }).eq('id', dep.userId);
-
+      await supabase.from('profiles').update({ active_plan_id: dep.planId, total_invested: dep.amount }).eq('id', dep.userId);
       const { data: userProfile } = await supabase.from('profiles').select('referred_by').eq('id', dep.userId).single();
       if (userProfile?.referred_by && userProfile.referred_by !== 'Direto') {
         const bonus = dep.amount * REFERRAL_RATES[0];
@@ -219,36 +221,50 @@ const App: React.FC = () => {
   const handleRequestWithdraw = async (amount: number, wallet: string) => {
     if (!currentUser) return;
     if (amount > currentUser.balance) return alert('Saldo insuficiente!');
-
     const { error } = await supabase.from('withdrawals').insert({
-      user_id: currentUser.id,
-      user_name: currentUser.name,
-      amount: amount,
-      wallet: wallet,
-      fee: amount * 0.05,
-      status: 'PENDING'
+      user_id: currentUser.id, user_name: currentUser.name,
+      amount: amount, wallet: wallet, fee: amount * 0.05, status: 'PENDING'
     });
-
-    if (error) {
-      console.error('Erro ao salvar saque:', error);
-      return alert('Erro ao salvar saque. Verifique se a tabela foi criada no SQL Editor.');
-    }
-
+    if (error) return alert('Erro ao solicitar saque. Verifique sua conexão.');
     await updateBalance(-amount);
-    alert('Saque solicitado com sucesso!');
+    alert('Saque solicitado!');
     setShowWithdraw(false);
     fetchUserProfile(currentUser.id);
   };
 
   const renderView = () => {
-    if (!currentUser) {
+    if (loading) {
       return (
-        <div className="flex-1 flex flex-col items-center justify-center p-10 text-center">
-          <div className="w-16 h-16 bg-slate-100 rounded-full mb-4 animate-spin border-4 border-emerald-500 border-t-transparent" />
-          <p className="text-slate-400 font-bold uppercase text-[10px]">Autenticando Perfil...</p>
+        <div className="flex-1 flex flex-col items-center justify-center p-10 text-center bg-white h-screen">
+          <div className="w-16 h-16 bg-emerald-50 rounded-full mb-6 flex items-center justify-center animate-spin border-4 border-emerald-500 border-t-transparent" />
+          <h3 className="text-sm font-black text-slate-800 uppercase italic mb-2 tracking-tighter">Sincronizando...</h3>
+          <p className="text-slate-400 font-bold uppercase text-[9px] tracking-widest">Aguardando resposta do servidor Global</p>
+          
+          {authChecked && !currentUser && (
+            <div className="mt-8 space-y-4 animate-in fade-in duration-1000">
+               <p className="text-red-500 text-[9px] font-black uppercase">O servidor está demorando a responder</p>
+               <button 
+                onClick={() => window.location.reload()} 
+                className="block w-full bg-slate-100 text-slate-600 font-black py-3 px-6 rounded-xl text-[10px] uppercase tracking-widest"
+               >
+                 Tentar Novamente
+               </button>
+               <button 
+                onClick={() => supabase.auth.signOut()} 
+                className="block w-full text-slate-400 font-black text-[10px] uppercase tracking-widest"
+               >
+                 Sair da Conta
+               </button>
+            </div>
+          )}
         </div>
       );
     }
+
+    if (!currentUser) {
+      return currentView === AppView.REGISTER ? <Register onSwitch={() => setCurrentView(AppView.LOGIN)} onRegister={() => setCurrentView(AppView.LOGIN)} /> : <Login onSwitch={() => setCurrentView(AppView.REGISTER)} onLogin={() => {}} />;
+    }
+
     switch (currentView) {
       case AppView.HOME: return <Home user={currentUser} myDeposits={myDeposits} updateBalance={updateBalance} performCheckIn={performCheckIn} addNotification={() => {}} onOpenWithdraw={() => setShowWithdraw(true)} onOpenDeposit={() => setShowDeposit(true)} onOpenWheel={() => setShowWheel(true)} />;
       case AppView.TASKS: return <Tasks user={currentUser} onCompleteTask={(r) => updateBalance(r)} />;
@@ -286,16 +302,14 @@ const App: React.FC = () => {
     }
   };
 
-  if (loading) return <div className="h-screen flex items-center justify-center bg-slate-50 font-black text-emerald-600 animate-pulse uppercase tracking-widest">Carregando...</div>;
-
   return (
     <Layout currentView={currentView} onViewChange={setCurrentView}>
       {renderView()}
       {showWelcome && <WelcomeModal onClose={() => setShowWelcome(false)} />}
-      {showWithdraw && <WithdrawModal user={currentUser} onClose={() => setShowWithdraw(false)} onSubmit={handleRequestWithdraw} />}
-      {showDeposit && <DepositModal wallet={customWallet} onClose={() => { setShowDeposit(false); setPendingPlanId(null); }} onConfirm={async (h) => {
-        const { error } = await supabase.from('deposits').insert({ user_id: currentUser?.id, user_name: currentUser?.name, amount: pendingPlanId ? PLANS.find(p => p.id === pendingPlanId)?.investment : 0, hash: h, plan_id: pendingPlanId, status: 'PENDING' });
-        if (!error) { alert('Comprovante enviado!'); setShowDeposit(false); fetchUserProfile(currentUser?.id || ''); }
+      {showWithdraw && currentUser && <WithdrawModal user={currentUser} onClose={() => setShowWithdraw(false)} onSubmit={handleRequestWithdraw} />}
+      {showDeposit && currentUser && <DepositModal wallet={customWallet} onClose={() => { setShowDeposit(false); setPendingPlanId(null); }} onConfirm={async (h) => {
+        const { error } = await supabase.from('deposits').insert({ user_id: currentUser.id, user_name: currentUser.name, amount: pendingPlanId ? PLANS.find(p => p.id === pendingPlanId)?.investment : 0, hash: h, plan_id: pendingPlanId, status: 'PENDING' });
+        if (!error) { alert('Comprovante enviado!'); setShowDeposit(false); fetchUserProfile(currentUser.id); }
       }} prefilledAmount={pendingPlanId ? PLANS.find(p => p.id === pendingPlanId)?.investment.toString() : ''} />}
       {showWheel && currentUser && <LuckyWheelModal user={currentUser} onClose={() => setShowWheel(false)} onWin={(a) => updateBalance(a)} />}
     </Layout>
