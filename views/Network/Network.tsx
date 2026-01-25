@@ -12,45 +12,68 @@ const NetworkView: React.FC<NetworkProps> = ({ user }) => {
   const [counts, setCounts] = useState<number[]>([0, 0, 0, 0, 0]);
   const [loading, setLoading] = useState(true);
   
-  // Link dinâmico com fallback caso o referralCode demore a carregar
   const getReferralLink = () => {
     if (typeof window === 'undefined') return '';
     const code = user.referralCode || '';
     if (!code) return '';
-    const origin = window.location.origin;
-    return `${origin}/?ref=${code}`;
+    return `${window.location.origin}/?ref=${code}`;
   };
 
   const referralLink = getReferralLink();
 
   useEffect(() => {
-    const fetchCounts = async () => {
+    const fetchFullNetwork = async () => {
       try {
         if (!user.referralCode) return;
         
-        // Busca contagem de nível 1
-        const { count, error } = await supabase
-          .from('profiles')
-          .select('*', { count: 'exact', head: true })
-          .eq('referred_by', user.referralCode);
-          
-        if (!error) setCounts([count || 0, 0, 0, 0, 0]);
+        // Nível 1 (Diretos)
+        const { data: level1, error: e1 } = await supabase.from('profiles').select('referral_code').eq('referred_by', user.referralCode);
+        if (e1) throw e1;
+        
+        const L1_codes = level1?.map(m => m.referral_code) || [];
+        const newCounts = [L1_codes.length, 0, 0, 0, 0];
+
+        // Nível 2
+        if (L1_codes.length > 0) {
+          const { data: level2 } = await supabase.from('profiles').select('referral_code').in('referred_by', L1_codes);
+          const L2_codes = level2?.map(m => m.referral_code) || [];
+          newCounts[1] = L2_codes.length;
+
+          // Nível 3
+          if (L2_codes.length > 0) {
+            const { data: level3 } = await supabase.from('profiles').select('referral_code').in('referred_by', L2_codes);
+            const L3_codes = level3?.map(m => m.referral_code) || [];
+            newCounts[2] = L3_codes.length;
+
+            // Nível 4
+            if (L3_codes.length > 0) {
+               const { data: level4 } = await supabase.from('profiles').select('referral_code').in('referred_by', L3_codes);
+               const L4_codes = level4?.map(m => m.referral_code) || [];
+               newCounts[3] = L4_codes.length;
+
+               // Nível 5
+               if (L4_codes.length > 0) {
+                 const { data: level5 } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).in('referred_by', L4_codes);
+                 newCounts[4] = level5?.length || 0;
+               }
+            }
+          }
+        }
+        
+        setCounts(newCounts);
       } catch (err) {
-        console.error("Erro rede:", err);
+        console.error("Erro contagem rede:", err);
       } finally {
         setLoading(false);
       }
     };
-    fetchCounts();
+    fetchFullNetwork();
   }, [user.referralCode]);
 
   const copyLink = () => {
-    if (!referralLink) {
-      alert('Aguarde o carregamento do seu código...');
-      return;
-    }
+    if (!referralLink) return;
     navigator.clipboard.writeText(referralLink);
-    alert('Link de convite copiado!');
+    alert('Link copiado!');
   };
 
   return (
@@ -66,7 +89,7 @@ const NetworkView: React.FC<NetworkProps> = ({ user }) => {
         
         <div className="bg-white/5 p-4 rounded-2xl mb-6 border border-white/5">
           <p className="text-[10px] font-bold text-white break-all text-center opacity-80 font-mono">
-            {referralLink || 'SINCRONIZANDO CÓDIGO...'}
+            {referralLink || 'SINCRONIZANDO...'}
           </p>
         </div>
 
@@ -82,7 +105,7 @@ const NetworkView: React.FC<NetworkProps> = ({ user }) => {
 
       <div className="space-y-3">
         {REFERRAL_RATES.map((rate, i) => (
-          <div key={i} className="bg-white rounded-[24px] p-5 flex items-center justify-between border border-gray-100 shadow-sm transition-all hover:border-emerald-100 group">
+          <div key={i} className="bg-white rounded-[24px] p-5 flex items-center justify-between border border-gray-100 shadow-sm group">
             <div className="flex items-center space-x-4">
               <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center font-black text-xs shadow-inner group-hover:bg-emerald-500 group-hover:text-white transition-colors">L{i+1}</div>
               <div>
@@ -91,20 +114,18 @@ const NetworkView: React.FC<NetworkProps> = ({ user }) => {
               </div>
             </div>
             <p className="text-sm font-black text-slate-800 tracking-tight">
-              {loading && i === 0 ? '...' : counts[i]} <span className="text-[8px] text-slate-300 uppercase">filiados</span>
+              {loading ? '...' : counts[i]} <span className="text-[8px] text-slate-300 uppercase">filiados</span>
             </p>
           </div>
         ))}
       </div>
 
       <div className="bg-emerald-900 rounded-[35px] p-8 text-white shadow-2xl relative overflow-hidden text-center group border border-white/5">
-        <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
         <p className="text-[10px] font-black opacity-60 uppercase tracking-widest mb-1 relative z-10">LUCRO TOTAL DA REDE</p>
         <h4 className="text-3xl font-black italic tracking-tighter relative z-10">
           {(user.network_earnings || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-sm opacity-40 uppercase font-normal">usdt</span>
         </h4>
       </div>
-
       <div className="h-20" />
     </div>
   );
