@@ -58,7 +58,23 @@ const App: React.FC = () => {
 
   const fetchUserProfile = async (userId: string) => {
     try {
-      const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+      let { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+      
+      // Se não encontrar o perfil, tenta criar um (Corrige a tela branca)
+      if (!data && !error) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: newProfile } = await supabase.from('profiles').insert({
+            id: user.id,
+            email: user.email,
+            name: user.user_metadata.name || 'Usuário',
+            referral_code: Math.random().toString(36).substring(2, 8).toUpperCase(),
+            referred_by: user.user_metadata.referred_by || 'Direto'
+          }).select().single();
+          data = newProfile;
+        }
+      }
+
       if (data) {
         const user = mapUserFromDB(data);
         setCurrentUser(user);
@@ -80,6 +96,8 @@ const App: React.FC = () => {
           setCurrentView(AppView.HOME);
         }
       }
+    } catch (e) {
+      console.error("Erro ao carregar perfil:", e);
     } finally {
       setLoading(false);
     }
@@ -107,6 +125,14 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        fetchUserProfile(session.user.id);
+      } else {
+        setLoading(false);
+      }
+    });
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
         setLoading(true);
@@ -134,21 +160,24 @@ const App: React.FC = () => {
   const performCheckIn = async () => {
     if (!currentUser) return;
     
-    // Pegar dados frescos para comparar data de forma segura
+    // Pegar data atual do sistema (ignorando horas para comparar o dia)
+    const now = new Date();
+    const today = now.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+    
     const { data: profile } = await supabase.from('profiles').select('last_check_in, check_in_streak, balance').eq('id', currentUser.id).single();
     
-    const today = new Date().toLocaleDateString('pt-BR');
-    const last = profile?.last_check_in ? new Date(profile.last_check_in).toLocaleDateString('pt-BR') : '';
-    
-    if (today === last) {
-      alert('Você já realizou o check-in hoje!');
-      return;
+    if (profile?.last_check_in) {
+      const last = new Date(profile.last_check_in).toISOString().split('T')[0];
+      if (today === last) {
+        alert('Você já realizou o check-in hoje!');
+        return;
+      }
     }
 
     const reward = 0.01;
     const { error } = await supabase.from('profiles').update({ 
       balance: (parseFloat(profile?.balance || 0)) + reward,
-      last_check_in: new Date().toISOString(),
+      last_check_in: now.toISOString(),
       check_in_streak: (profile?.check_in_streak || 0) + 1
     }).eq('id', currentUser.id);
     
@@ -202,7 +231,7 @@ const App: React.FC = () => {
 
     if (error) {
       console.error('Erro ao salvar saque:', error);
-      return alert('Erro ao salvar saque no banco. Verifique se a tabela foi criada.');
+      return alert('Erro ao salvar saque. Verifique se a tabela foi criada no SQL Editor.');
     }
 
     await updateBalance(-amount);
@@ -212,7 +241,14 @@ const App: React.FC = () => {
   };
 
   const renderView = () => {
-    if (!currentUser) return null;
+    if (!currentUser) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center p-10 text-center">
+          <div className="w-16 h-16 bg-slate-100 rounded-full mb-4 animate-spin border-4 border-emerald-500 border-t-transparent" />
+          <p className="text-slate-400 font-bold uppercase text-[10px]">Autenticando Perfil...</p>
+        </div>
+      );
+    }
     switch (currentView) {
       case AppView.HOME: return <Home user={currentUser} myDeposits={myDeposits} updateBalance={updateBalance} performCheckIn={performCheckIn} addNotification={() => {}} onOpenWithdraw={() => setShowWithdraw(true)} onOpenDeposit={() => setShowDeposit(true)} onOpenWheel={() => setShowWheel(true)} />;
       case AppView.TASKS: return <Tasks user={currentUser} onCompleteTask={(r) => updateBalance(r)} />;
@@ -258,10 +294,10 @@ const App: React.FC = () => {
       {showWelcome && <WelcomeModal onClose={() => setShowWelcome(false)} />}
       {showWithdraw && <WithdrawModal user={currentUser} onClose={() => setShowWithdraw(false)} onSubmit={handleRequestWithdraw} />}
       {showDeposit && <DepositModal wallet={customWallet} onClose={() => { setShowDeposit(false); setPendingPlanId(null); }} onConfirm={async (h) => {
-        const { error } = await supabase.from('deposits').insert({ user_id: currentUser.id, user_name: currentUser.name, amount: pendingPlanId ? PLANS.find(p => p.id === pendingPlanId)?.investment : 0, hash: h, plan_id: pendingPlanId, status: 'PENDING' });
-        if (!error) { alert('Comprovante enviado!'); setShowDeposit(false); fetchUserProfile(currentUser.id); }
+        const { error } = await supabase.from('deposits').insert({ user_id: currentUser?.id, user_name: currentUser?.name, amount: pendingPlanId ? PLANS.find(p => p.id === pendingPlanId)?.investment : 0, hash: h, plan_id: pendingPlanId, status: 'PENDING' });
+        if (!error) { alert('Comprovante enviado!'); setShowDeposit(false); fetchUserProfile(currentUser?.id || ''); }
       }} prefilledAmount={pendingPlanId ? PLANS.find(p => p.id === pendingPlanId)?.investment.toString() : ''} />}
-      {showWheel && <LuckyWheelModal user={currentUser} onClose={() => setShowWheel(false)} onWin={(a) => updateBalance(a)} />}
+      {showWheel && currentUser && <LuckyWheelModal user={currentUser} onClose={() => setShowWheel(false)} onWin={(a) => updateBalance(a)} />}
     </Layout>
   );
 };

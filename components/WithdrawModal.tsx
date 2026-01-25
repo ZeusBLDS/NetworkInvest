@@ -6,7 +6,8 @@ import { APP_CONFIG } from '../constants';
 interface WithdrawModalProps {
   user: User;
   onClose: () => void;
-  onSubmit: (amount: number) => void;
+  // Fixed: Added wallet parameter to match the function signature expected by handleRequestWithdraw in App.tsx
+  onSubmit: (amount: number, wallet: string) => void;
 }
 
 const WithdrawModal: React.FC<WithdrawModalProps> = ({ user, onClose, onSubmit }) => {
@@ -24,7 +25,8 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ user, onClose, onSubmit }
       alert('Saldo insuficiente');
       return;
     }
-    onSubmit(numAmount);
+    // Fixed: Now passing both amount and wallet as required by the updated onSubmit signature
+    onSubmit(numAmount, wallet);
   };
 
   return (
