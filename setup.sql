@@ -22,18 +22,24 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. HABILITAR RLS E CRIAR POLÍTICAS DE BACKUP
+-- 2. TABELA DE TAREFAS (NOVA)
+CREATE TABLE IF NOT EXISTS public.user_tasks (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  reward DECIMAL(12,2) DEFAULT 0,
+  plan_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 3. HABILITAR RLS
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_tasks ENABLE ROW LEVEL SECURITY;
 
--- Permitir que o usuário insira seu próprio perfil (Caso o trigger falhe)
-DO $$ 
-BEGIN 
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can insert their own profile') THEN
-        CREATE POLICY "Users can insert their own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
-    END IF;
-END $$;
+-- POLÍTICAS TAREFAS
+CREATE POLICY "Users can see their own tasks" ON public.user_tasks FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert their own tasks" ON public.user_tasks FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- 3. FUNÇÃO DE TRIGGER MELHORADA
+-- 4. TRIGGER PARA NOVOS USUÁRIOS
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -51,7 +57,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 4. RE-VINCULAR TRIGGER
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users

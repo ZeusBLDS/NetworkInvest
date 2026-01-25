@@ -9,7 +9,8 @@ export const PLANS: Plan[] = [
     dailyReturn: 0.10,
     dailyPercent: 0, 
     durationDays: 90,
-    totalReturn: 9.00
+    totalReturn: 9.00,
+    tasksPerDay: 1
   },
   {
     id: 'vip1',
@@ -18,7 +19,8 @@ export const PLANS: Plan[] = [
     dailyReturn: 0.30,
     dailyPercent: 10,
     durationDays: 90,
-    totalReturn: 30.00
+    totalReturn: 30.00,
+    tasksPerDay: 3
   },
   {
     id: 'vip2',
@@ -27,7 +29,8 @@ export const PLANS: Plan[] = [
     dailyReturn: 1.60, 
     dailyPercent: 8,
     durationDays: 90,
-    totalReturn: 164.00
+    totalReturn: 164.00,
+    tasksPerDay: 5
   },
   {
     id: 'vip3',
@@ -36,7 +39,8 @@ export const PLANS: Plan[] = [
     dailyReturn: 3.50, 
     dailyPercent: 7,
     durationDays: 90,
-    totalReturn: 365.00
+    totalReturn: 365.00,
+    tasksPerDay: 5
   },
   {
     id: 'vip4',
@@ -45,7 +49,8 @@ export const PLANS: Plan[] = [
     dailyReturn: 16.00, 
     dailyPercent: 20,
     durationDays: 90,
-    totalReturn: 1520.00
+    totalReturn: 1520.00,
+    tasksPerDay: 5
   }
 ];
 

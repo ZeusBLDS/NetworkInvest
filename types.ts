@@ -3,6 +3,7 @@ export enum AppView {
   LOGIN = 'LOGIN',
   REGISTER = 'REGISTER',
   HOME = 'HOME',
+  TASKS = 'TASKS',
   PLANS = 'PLANS',
   NETWORK = 'NETWORK',
   ACCOUNT = 'ACCOUNT',
@@ -31,7 +32,7 @@ export interface User {
   status: UserStatus;
   totalInvested: number;
   totalWithdrawn: number;
-  network_earnings: number; // Adicionado para rastrear lucros de indicação
+  network_earnings: number;
 }
 
 export interface Plan {
@@ -42,6 +43,7 @@ export interface Plan {
   dailyPercent: number;
   durationDays: number;
   totalReturn: number;
+  tasksPerDay: number;
   withdrawalLimit?: number;
 }
 
