@@ -21,7 +21,7 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.LOGIN);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [authChecked, setAuthChecked] = useState(false);
+  const [authSession, setAuthSession] = useState<any>(null);
   const [customWallet, setCustomWallet] = useState(APP_CONFIG.DEPOSIT_WALLET);
   
   const [allUsers, setAllUsers] = useState<User[]>([]);
@@ -59,23 +59,39 @@ const App: React.FC = () => {
 
   const fetchUserProfile = async (userId: string) => {
     try {
-      console.log("Buscando perfil para:", userId);
+      setLoading(true);
+      console.log("Iniciando busca de perfil para:", userId);
+      
       let { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
       
-      if (!data && !error) {
-        console.log("Perfil não encontrado, tentando criar...");
+      if (error) {
+        console.error("Erro Supabase ao buscar perfil:", error);
+        throw error;
+      }
+
+      // Se não encontrar o perfil na tabela profiles, tenta criar um automaticamente
+      if (!data) {
+        console.log("Perfil inexistente. Criando registro na tabela profiles...");
         const { data: { user } } = await supabase.auth.getUser();
+        
         if (user) {
-          const { data: newProfile, error: insertError } = await supabase.from('profiles').insert({
+          const newRefCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+          const { data: insertedData, error: insertError } = await supabase.from('profiles').insert({
             id: user.id,
             email: user.email,
-            name: user.user_metadata?.name || 'Novo Usuário',
-            referral_code: Math.random().toString(36).substring(2, 8).toUpperCase(),
-            referred_by: user.user_metadata?.referred_by || 'Direto'
+            name: user.user_metadata?.name || 'Membro NI',
+            referral_code: newRefCode,
+            referred_by: user.user_metadata?.referred_by || 'Direto',
+            balance: 0,
+            role: 'USER',
+            status: 'ACTIVE'
           }).select().single();
-          
-          if (insertError) throw insertError;
-          data = newProfile;
+
+          if (insertError) {
+            console.error("Erro ao inserir novo perfil:", insertError);
+            throw insertError;
+          }
+          data = insertedData;
         }
       }
 
@@ -83,6 +99,7 @@ const App: React.FC = () => {
         const user = mapUserFromDB(data);
         setCurrentUser(user);
         
+        // Buscar depósitos do usuário
         const { data: deps } = await supabase.from('deposits').select('*').eq('user_id', userId).order('created_at', { ascending: false });
         if (deps) setMyDeposits(deps.map((req: any) => ({
           id: req.id, userId: req.user_id, userName: req.user_name,
@@ -91,23 +108,22 @@ const App: React.FC = () => {
         })));
 
         if (user.role === 'ADMIN') await fetchAdminData();
+        
         if (user.isFirstLogin) {
           setShowWelcome(true);
           await supabase.from('profiles').update({ is_first_login: false }).eq('id', userId);
         }
 
+        // Muda para HOME se o perfil carregar com sucesso
         if (currentView === AppView.LOGIN || currentView === AppView.REGISTER) {
           setCurrentView(AppView.HOME);
         }
-      } else {
-        // Se chegamos aqui, algo deu muito errado na busca/criação
-        console.error("Falha crítica ao obter dados do perfil.");
       }
     } catch (e) {
-      console.error("Erro ao carregar perfil:", e);
+      console.error("Falha ao sincronizar perfil:", e);
+      // Se der erro, mantemos o estado carregando mas podemos mostrar algo para o usuário se necessário
     } finally {
       setLoading(false);
-      setAuthChecked(true);
     }
   };
 
@@ -133,27 +149,28 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    // Check initial session
+    // Verificar sessão inicial
     supabase.auth.getSession().then(({ data: { session } }) => {
+      setAuthSession(session);
       if (session) {
         fetchUserProfile(session.user.id);
       } else {
         setLoading(false);
-        setAuthChecked(true);
       }
     });
 
+    // Escutar mudanças de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthSession(session);
       if (session) {
-        setLoading(true);
         fetchUserProfile(session.user.id);
       } else {
         setCurrentUser(null);
         setLoading(false);
-        setAuthChecked(true);
         setCurrentView(AppView.LOGIN);
       }
     });
+    
     return () => subscription.unsubscribe();
   }, []);
 
@@ -233,38 +250,43 @@ const App: React.FC = () => {
   };
 
   const renderView = () => {
+    // Tela de Carregamento Principal (com botões de fuga)
     if (loading) {
       return (
         <div className="flex-1 flex flex-col items-center justify-center p-10 text-center bg-white h-screen">
-          <div className="w-16 h-16 bg-emerald-50 rounded-full mb-6 flex items-center justify-center animate-spin border-4 border-emerald-500 border-t-transparent" />
-          <h3 className="text-sm font-black text-slate-800 uppercase italic mb-2 tracking-tighter">Sincronizando...</h3>
-          <p className="text-slate-400 font-bold uppercase text-[9px] tracking-widest">Aguardando resposta do servidor Global</p>
+          <div className="w-16 h-16 bg-emerald-50 rounded-full mb-6 flex items-center justify-center animate-spin border-4 border-emerald-500 border-t-transparent shadow-inner" />
+          <h3 className="text-sm font-black text-slate-800 uppercase italic mb-2 tracking-tighter">Sincronizando Perfil...</h3>
+          <p className="text-slate-400 font-bold uppercase text-[9px] tracking-widest leading-relaxed max-w-[200px] mx-auto">
+            Aguardando resposta segura do Servidor Global NI
+          </p>
           
-          {authChecked && !currentUser && (
-            <div className="mt-8 space-y-4 animate-in fade-in duration-1000">
-               <p className="text-red-500 text-[9px] font-black uppercase">O servidor está demorando a responder</p>
-               <button 
+          <div className="mt-12 space-y-4 w-full max-w-[200px] animate-in fade-in slide-in-from-bottom duration-1000">
+             <button 
                 onClick={() => window.location.reload()} 
-                className="block w-full bg-slate-100 text-slate-600 font-black py-3 px-6 rounded-xl text-[10px] uppercase tracking-widest"
-               >
-                 Tentar Novamente
-               </button>
-               <button 
+                className="w-full bg-slate-100 text-slate-600 font-black py-3 px-6 rounded-xl text-[9px] uppercase tracking-widest active:scale-95 transition-all"
+             >
+                Recarregar App
+             </button>
+             <button 
                 onClick={() => supabase.auth.signOut()} 
-                className="block w-full text-slate-400 font-black text-[10px] uppercase tracking-widest"
-               >
-                 Sair da Conta
-               </button>
-            </div>
-          )}
+                className="w-full text-red-400 font-black text-[9px] uppercase tracking-widest active:scale-95 transition-all"
+             >
+                Deslogar e Sair
+             </button>
+          </div>
         </div>
       );
     }
 
+    // Se não estiver carregando mas não tiver usuário logado, mostra Login/Registro
     if (!currentUser) {
-      return currentView === AppView.REGISTER ? <Register onSwitch={() => setCurrentView(AppView.LOGIN)} onRegister={() => setCurrentView(AppView.LOGIN)} /> : <Login onSwitch={() => setCurrentView(AppView.REGISTER)} onLogin={() => {}} />;
+      if (currentView === AppView.REGISTER) {
+        return <Register onSwitch={() => setCurrentView(AppView.LOGIN)} onRegister={() => setCurrentView(AppView.LOGIN)} />;
+      }
+      return <Login onSwitch={() => setCurrentView(AppView.REGISTER)} onLogin={() => {}} />;
     }
 
+    // Navegação Principal do Usuário Logado
     switch (currentView) {
       case AppView.HOME: return <Home user={currentUser} myDeposits={myDeposits} updateBalance={updateBalance} performCheckIn={performCheckIn} addNotification={() => {}} onOpenWithdraw={() => setShowWithdraw(true)} onOpenDeposit={() => setShowDeposit(true)} onOpenWheel={() => setShowWheel(true)} />;
       case AppView.TASKS: return <Tasks user={currentUser} onCompleteTask={(r) => updateBalance(r)} />;
