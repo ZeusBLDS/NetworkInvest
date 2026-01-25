@@ -5,52 +5,52 @@ export const PLANS: Plan[] = [
   {
     id: 'vip0',
     name: 'VIP 0',
-    investment: 0,
-    dailyReturn: 0.10,
-    dailyPercent: 0, 
-    durationDays: 90,
+    investment: 3,
+    dailyReturn: 0.30,
+    dailyPercent: 10, 
+    durationDays: 30,
     totalReturn: 9.00,
     tasksPerDay: 1
   },
   {
     id: 'vip1',
     name: 'VIP 1',
-    investment: 3,
-    dailyReturn: 0.30,
-    dailyPercent: 10,
+    investment: 20,
+    dailyReturn: 1.60,
+    dailyPercent: 8,
     durationDays: 90,
-    totalReturn: 30.00,
-    tasksPerDay: 3
+    totalReturn: 144.00,
+    tasksPerDay: 1
   },
   {
     id: 'vip2',
     name: 'VIP 2',
-    investment: 20,
-    dailyReturn: 1.60, 
-    dailyPercent: 8,
+    investment: 50,
+    dailyReturn: 3.00, 
+    dailyPercent: 6,
     durationDays: 90,
-    totalReturn: 164.00,
-    tasksPerDay: 5
+    totalReturn: 270.00,
+    tasksPerDay: 1
   },
   {
     id: 'vip3',
     name: 'VIP 3',
-    investment: 50,
-    dailyReturn: 3.50, 
-    dailyPercent: 7,
+    investment: 100,
+    dailyReturn: 5.50, // Ajustado para ser progressivo (conforme sua lista enviada)
+    dailyPercent: 5.5,
     durationDays: 90,
-    totalReturn: 365.00,
-    tasksPerDay: 5
+    totalReturn: 495.00,
+    tasksPerDay: 1
   },
   {
     id: 'vip4',
     name: 'VIP 4',
-    investment: 80,
-    dailyReturn: 16.00, 
-    dailyPercent: 20,
+    investment: 150,
+    dailyReturn: 8.00, 
+    dailyPercent: 5.3,
     durationDays: 90,
-    totalReturn: 1520.00,
-    tasksPerDay: 5
+    totalReturn: 720.00,
+    tasksPerDay: 1
   }
 ];
 

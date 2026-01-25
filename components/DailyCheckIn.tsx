@@ -10,15 +10,16 @@ interface DailyCheckInProps {
 const DailyCheckIn: React.FC<DailyCheckInProps> = ({ user, onCheckIn }) => {
   const [loading, setLoading] = useState(false);
   
-  const today = new Date().toDateString();
-  const lastCheckInDate = user.lastCheckIn ? new Date(user.lastCheckIn).toDateString() : '';
+  // Comparação de data local robusta
+  const today = new Date().toLocaleDateString('pt-BR');
+  const lastCheckInDate = user.lastCheckIn ? new Date(user.lastCheckIn).toLocaleDateString('pt-BR') : '';
   const alreadyCheckedIn = lastCheckInDate === today;
 
-  const displayStreak = user.checkInStreak;
-  const currentDayInCycle = alreadyCheckedIn ? ((displayStreak - 1) % 30) + 1 : (displayStreak % 30) + 1;
-  const earningToday = (alreadyCheckedIn ? currentDayInCycle : (displayStreak % 30) + 1) * 0.01;
+  const displayStreak = user.checkInStreak || 0;
+  const currentDayInCycle = ((displayStreak - (alreadyCheckedIn ? 1 : 0)) % 30) + 1;
+  const earningToday = 0.01;
 
-  const totalProfit = user.balance + user.totalWithdrawn;
+  const totalProfit = (user.balance || 0) + (user.totalWithdrawn || 0);
 
   const handleCheckIn = async () => {
     if (alreadyCheckedIn || loading) return;
@@ -82,10 +83,6 @@ const DailyCheckIn: React.FC<DailyCheckInProps> = ({ user, onCheckIn }) => {
             }`} 
           />
         ))}
-      </div>
-      
-      <div className="mt-4 text-center">
-        <p className="text-[8px] text-slate-300 font-bold uppercase tracking-widest">Sua sequência atual: {displayStreak} dias</p>
       </div>
     </div>
   );
