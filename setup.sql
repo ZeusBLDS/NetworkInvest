@@ -22,7 +22,6 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ADIÇÃO DE ÍNDICES PARA PERFORMANCE DA REDE
 CREATE INDEX IF NOT EXISTS idx_profiles_referral_code ON public.profiles(referral_code);
 CREATE INDEX IF NOT EXISTS idx_profiles_referred_by ON public.profiles(referred_by);
 
@@ -35,7 +34,7 @@ CREATE TABLE IF NOT EXISTS public.user_tasks (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 3. TABELA DE DEPÓSITOS
+-- 3. TABELA DE DEPÓSITOS (Incluindo Method)
 CREATE TABLE IF NOT EXISTS public.deposits (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -43,35 +42,52 @@ CREATE TABLE IF NOT EXISTS public.deposits (
   amount DECIMAL(12,2),
   hash TEXT,
   plan_id TEXT,
+  method TEXT DEFAULT 'USDT',
   status TEXT DEFAULT 'PENDING',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 4. TABELA DE SAQUES
+-- 4. TABELA DE SAQUES (Incluindo Method)
 CREATE TABLE IF NOT EXISTS public.withdrawals (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   user_name TEXT,
   amount DECIMAL(12,2),
   wallet TEXT,
+  method TEXT DEFAULT 'USDT',
   fee DECIMAL(12,2) DEFAULT 0,
   status TEXT DEFAULT 'PENDING',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 5. HABILITAR RLS E POLÍTICAS
+-- 5. HABILITAR RLS
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.deposits ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.withdrawals ENABLE ROW LEVEL SECURITY;
 
 -- Políticas para usuários verem seus próprios dados
+DROP POLICY IF EXISTS "Own profiles" ON public.profiles;
 CREATE POLICY "Own profiles" ON public.profiles FOR SELECT USING (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Own tasks" ON public.user_tasks;
 CREATE POLICY "Own tasks" ON public.user_tasks FOR SELECT USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Own deposits" ON public.deposits;
 CREATE POLICY "Own deposits" ON public.deposits FOR SELECT USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Own withdrawals" ON public.withdrawals;
 CREATE POLICY "Own withdrawals" ON public.withdrawals FOR SELECT USING (auth.uid() = user_id);
 
 -- Permitir inserção
+DROP POLICY IF EXISTS "Insert own tasks" ON public.user_tasks;
 CREATE POLICY "Insert own tasks" ON public.user_tasks FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Insert own deposits" ON public.deposits;
 CREATE POLICY "Insert own deposits" ON public.deposits FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Insert own withdrawals" ON public.withdrawals;
 CREATE POLICY "Insert own withdrawals" ON public.withdrawals FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- POLÍTICA PARA ADMINS (Opcional: permite que usuários com role 'ADMIN' vejam tudo)
+-- CREATE POLICY "Admins view all" ON public.profiles FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'ADMIN'));

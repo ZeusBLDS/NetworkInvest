@@ -31,6 +31,8 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ user, onClose, onSubmit }
     onSubmit(numAmount, wallet, method);
   };
 
+  const currentFee = method === 'PIX' ? 0.10 : 0;
+
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 backdrop-blur-sm p-6">
       <div className="bg-white rounded-[40px] w-full max-w-sm p-8 shadow-2xl animate-in zoom-in duration-300 overflow-hidden relative">
@@ -43,16 +45,16 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ user, onClose, onSubmit }
         {/* Seletor de Método */}
         <div className="flex bg-slate-100 p-1 rounded-2xl mb-6">
           <button 
-            onClick={() => setMethod('USDT')}
+            onClick={() => { setMethod('USDT'); setWallet(user.walletAddress || ''); }}
             className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${method === 'USDT' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'}`}
           >
-            USDT
+            USDT (FREE)
           </button>
           <button 
-            onClick={() => setMethod('PIX')}
+            onClick={() => { setMethod('PIX'); setWallet(''); }}
             className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${method === 'PIX' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'}`}
           >
-            PIX
+            PIX (10%)
           </button>
         </div>
 
@@ -74,9 +76,16 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ user, onClose, onSubmit }
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
             />
-            <p className="mt-2 text-[9px] font-black text-emerald-600/60 px-1 uppercase tracking-widest">
-              * Mínimo de saque: {APP_CONFIG.MIN_WITHDRAWAL} USDT
-            </p>
+            <div className="flex justify-between items-center mt-2 px-1">
+              <p className="text-[9px] font-black text-emerald-600/60 uppercase tracking-widest">
+                * Mínimo: {APP_CONFIG.MIN_WITHDRAWAL} USDT
+              </p>
+              {parseFloat(amount) > 0 && (
+                <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest">
+                  Taxa: {(parseFloat(amount) * currentFee).toFixed(2)} USDT
+                </p>
+              )}
+            </div>
           </div>
 
           <div>
