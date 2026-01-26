@@ -81,7 +81,7 @@ const App: React.FC = () => {
         if (deps) setMyDeposits(deps.map((req: any) => ({
           id: req.id, userId: req.user_id, userName: req.user_name,
           amount: parseFloat(req.amount), hash: req.hash, planId: req.plan_id,
-          status: req.status, timestamp: new Date(req.created_at).getTime(), method: 'USDT'
+          status: req.status, timestamp: new Date(req.created_at).getTime(), method: req.method || 'USDT'
         })));
         if (user.role === 'ADMIN') await fetchAdminData();
         if (user.isFirstLogin) {
@@ -108,12 +108,12 @@ const App: React.FC = () => {
       if (deps) setDeposits(deps.map((req: any) => ({
         id: req.id, userId: req.user_id, userName: req.user_name,
         amount: parseFloat(req.amount), hash: req.hash, planId: req.plan_id,
-        status: req.status, timestamp: new Date(req.created_at).getTime(), method: 'USDT'
+        status: req.status, timestamp: new Date(req.created_at).getTime(), method: req.method || 'USDT'
       })));
       if (withs) setWithdrawals(withs.map((req: any) => ({
         id: req.id, userId: req.user_id, userName: req.user_name,
         amount: parseFloat(req.amount), wallet: req.wallet, fee: parseFloat(req.fee || 0),
-        status: req.status, timestamp: new Date(req.created_at).getTime()
+        status: req.status, timestamp: new Date(req.created_at).getTime(), method: req.method || 'USDT'
       })));
     } catch (e) { console.error('Admin Fetch Error:', e); }
   };
@@ -206,12 +206,13 @@ const App: React.FC = () => {
     fetchAdminData();
   };
 
-  const handleRequestWithdraw = async (amount: number, wallet: string) => {
+  const handleRequestWithdraw = async (amount: number, wallet: string, method: 'USDT' | 'PIX') => {
     if (!currentUser) return;
     if (amount > currentUser.balance) return alert('Saldo insuficiente!');
     const { error } = await supabase.from('withdrawals').insert({
       user_id: currentUser.id, user_name: currentUser.name,
-      amount: amount, wallet: wallet, fee: amount * 0.05, status: 'PENDING'
+      amount: amount, wallet: wallet, fee: amount * 0.05, status: 'PENDING',
+      method: method
     });
     if (!error) {
       await updateBalance(-amount);
@@ -222,7 +223,7 @@ const App: React.FC = () => {
   };
 
   const renderView = () => {
-    if (loading) return <div className="flex-1 flex flex-col items-center justify-center p-10 h-screen bg-white">Sincronizando...</div>;
+    if (loading) return <div className="flex-1 flex flex-col items-center justify-center p-10 h-screen bg-white text-xs font-black uppercase tracking-widest text-emerald-600">Sincronizando Terminal...</div>;
     if (!currentUser) return currentView === AppView.REGISTER ? <Register onSwitch={() => setCurrentView(AppView.LOGIN)} onRegister={() => {}} /> : <Login onSwitch={() => setCurrentView(AppView.REGISTER)} onLogin={() => {}} />;
 
     switch (currentView) {
@@ -241,9 +242,17 @@ const App: React.FC = () => {
       {renderView()}
       {showWelcome && <WelcomeModal onClose={() => setShowWelcome(false)} />}
       {showWithdraw && currentUser && <WithdrawModal user={currentUser} onClose={() => setShowWithdraw(false)} onSubmit={handleRequestWithdraw} />}
-      {showDeposit && currentUser && <DepositModal wallet={customWallet} onClose={() => { setShowDeposit(false); setPendingPlanId(null); }} onConfirm={async (h) => {
-        const { error } = await supabase.from('deposits').insert({ user_id: currentUser.id, user_name: currentUser.name, amount: pendingPlanId ? PLANS.find(p => p.id === pendingPlanId)?.investment : 0, hash: h, plan_id: pendingPlanId, status: 'PENDING' });
-        if (!error) { alert('Enviado!'); setShowDeposit(false); fetchUserProfile(currentUser.id); }
+      {showDeposit && currentUser && <DepositModal wallet={customWallet} onClose={() => { setShowDeposit(false); setPendingPlanId(null); }} onConfirm={async (h, m) => {
+        const { error } = await supabase.from('deposits').insert({ 
+          user_id: currentUser.id, 
+          user_name: currentUser.name, 
+          amount: pendingPlanId ? PLANS.find(p => p.id === pendingPlanId)?.investment : 0, 
+          hash: h, 
+          plan_id: pendingPlanId, 
+          status: 'PENDING',
+          method: m
+        });
+        if (!error) { alert('Solicitação enviada! Aguarde a aprovação.'); setShowDeposit(false); fetchUserProfile(currentUser.id); }
       }} prefilledAmount={pendingPlanId ? PLANS.find(p => p.id === pendingPlanId)?.investment.toString() : ''} />}
       {showWheel && currentUser && <LuckyWheelModal user={currentUser} onClose={() => setShowWheel(false)} onWin={(a) => updateBalance(a)} />}
     </Layout>

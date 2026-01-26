@@ -85,12 +85,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                         <div>
                           <p className="text-xs font-black text-slate-800 uppercase mb-1">{req.userName}</p>
                           <p className="text-[8px] text-slate-400 font-bold">{new Date(req.timestamp).toLocaleString()}</p>
-                          <span className="text-[7px] bg-slate-100 px-2 py-0.5 rounded uppercase font-black">{req.status}</span>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <span className="text-[7px] bg-slate-100 px-2 py-0.5 rounded uppercase font-black">{req.status}</span>
+                            <span className={`text-[7px] font-black uppercase px-2 py-0.5 rounded ${req.method === 'PIX' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                              {req.method}
+                            </span>
+                          </div>
                         </div>
                         <p className="text-lg font-black text-emerald-600">{req.amount.toFixed(2)}</p>
                       </div>
                       <div className="bg-slate-50 p-3 rounded-xl mb-4 text-[9px] font-mono break-all leading-tight border">
-                        HASH: {req.hash || 'Sem Hash'}
+                        {req.method === 'PIX' ? 'COMPROVANTE / PAGADOR:' : 'HASH:'} {req.hash || 'N/A'}
                       </div>
                       {req.status === 'PENDING' && (
                         <div className="flex gap-2">
@@ -113,7 +118,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                         <div>
                           <p className="text-xs font-black text-slate-800 uppercase mb-1">{req.userName}</p>
                           <p className="text-[8px] text-slate-400 font-bold">{new Date(req.timestamp).toLocaleString()}</p>
-                          <span className="text-[7px] bg-amber-50 text-amber-600 px-2 py-0.5 rounded uppercase font-black">{req.status}</span>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <span className="text-[7px] bg-amber-50 text-amber-600 px-2 py-0.5 rounded uppercase font-black">{req.status}</span>
+                            <span className={`text-[7px] font-black uppercase px-2 py-0.5 rounded ${req.method === 'PIX' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                              {req.method}
+                            </span>
+                          </div>
                         </div>
                         <div className="text-right">
                           <p className="text-lg font-black text-amber-600">{req.amount.toFixed(2)}</p>
@@ -121,7 +131,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                         </div>
                       </div>
                       <div className="bg-slate-900 p-3 rounded-xl mb-4 text-white text-[9px] font-mono break-all leading-tight">
-                        CARTEIRA: {req.wallet}
+                        {req.method === 'PIX' ? 'CHAVE PIX:' : 'CARTEIRA:'} {req.wallet}
                       </div>
                       {req.status === 'PENDING' && (
                         <div className="flex gap-2">

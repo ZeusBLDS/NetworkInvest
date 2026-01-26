@@ -66,7 +66,7 @@ export interface DepositRequest {
   planId?: string;
   timestamp: number;
   status: RequestStatus;
-  method: string;
+  method: 'USDT' | 'PIX';
 }
 
 export interface WithdrawRequest {
@@ -78,4 +78,5 @@ export interface WithdrawRequest {
   fee: number;
   timestamp: number;
   status: RequestStatus;
+  method: 'USDT' | 'PIX';
 }
