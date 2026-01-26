@@ -14,7 +14,8 @@ const DepositModal: React.FC<DepositModalProps> = ({ onClose, onConfirm, prefill
   const [hash, setHash] = useState('');
   const isPlanPurchase = prefilledAmount !== '';
 
-  const pixKey = "financeiro@networkinvest.com"; // Exemplo de chave PIX
+  // Chave PIX atualizada conforme solicitado
+  const pixKey = "b756b40c-8869-42a3-bd58-90aee532ca2f"; 
 
   useEffect(() => {
     setAmount(prefilledAmount);
