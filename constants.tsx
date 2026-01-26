@@ -57,7 +57,7 @@ export const PLANS: Plan[] = [
 export const REFERRAL_RATES = [0.05, 0.03, 0.01, 0.01, 0.01];
 
 export const APP_CONFIG = {
-  MIN_WITHDRAWAL: 3,
+  MIN_WITHDRAWAL: 5,
   NETWORK: 'USDT (BSC / BEP20)',
   DEFAULT_REFERRER: 'Não informado',
   DEPOSIT_WALLET: '0xc68b8357ca00a27781630d341096bc54e4c4b30f'

@@ -163,25 +163,20 @@ const App: React.FC = () => {
     const dep = deposits.find(d => d.id === id);
     if (!dep) return;
     
-    // 1. Aprovar o depósito
     await supabase.from('deposits').update({ status: 'APPROVED' }).eq('id', id);
     
     if (dep.planId) {
-      // 2. Ativar o plano para o usuário
       await supabase.from('profiles').update({ 
         active_plan_id: dep.planId, 
         total_invested: dep.amount 
       }).eq('id', dep.userId);
 
-      // 3. Lógica Multinível (5 Níveis)
       let currentMemberId = dep.userId;
       let nextUplineCode = '';
 
-      // Busca quem indicou o investidor
       const { data: firstLevel } = await supabase.from('profiles').select('referred_by').eq('id', currentMemberId).single();
       nextUplineCode = firstLevel?.referred_by || '';
 
-      // Loop por 5 níveis de indicação
       for (let level = 0; level < 5; level++) {
         if (!nextUplineCode || nextUplineCode === 'Direto' || nextUplineCode === 'Não informado') break;
 
@@ -199,21 +194,15 @@ const App: React.FC = () => {
               balance: (parseFloat(uplineProfile.balance) || 0) + bonus,
               network_earnings: (parseFloat(uplineProfile.network_earnings) || 0) + bonus
             }).eq('id', uplineProfile.id);
-            
-            console.log(`Bônus Nível ${level + 1} pago para ${nextUplineCode}: ${bonus} USDT`);
           }
-          
-          // Prepara para o próximo nível
           nextUplineCode = uplineProfile.referred_by || '';
         } else {
-          break; // Fim da linha de indicação
+          break;
         }
       }
     } else {
-      // Depósito avulso (apenas saldo)
       await updateBalance(dep.amount, dep.userId);
     }
-    
     fetchAdminData();
   };
 
@@ -238,7 +227,7 @@ const App: React.FC = () => {
 
     switch (currentView) {
       case AppView.HOME: return <Home user={currentUser} myDeposits={myDeposits} updateBalance={updateBalance} performCheckIn={performCheckIn} addNotification={() => {}} onOpenWithdraw={() => setShowWithdraw(true)} onOpenDeposit={() => setShowDeposit(true)} onOpenWheel={() => setShowWheel(true)} />;
-      case AppView.TASKS: return <Tasks user={currentUser} onCompleteTask={(r) => updateBalance(r)} />;
+      case AppView.TASKS: return <Tasks user={currentUser} onCompleteTask={(r) => updateBalance(r)} onViewChange={setCurrentView} />;
       case AppView.PLANS: return <PlanList user={currentUser} myDeposits={myDeposits} onActivate={(pid) => { setPendingPlanId(pid); setShowDeposit(true); }} />;
       case AppView.NETWORK: return <NetworkView user={currentUser} />;
       case AppView.ACCOUNT: return <Account user={currentUser} onLogout={() => supabase.auth.signOut()} onUpdateUser={async (u) => { await supabase.from('profiles').update({ wallet_address: u.walletAddress }).eq('id', u.id); fetchUserProfile(u.id); }} onViewChange={setCurrentView} notifications={[]} />;

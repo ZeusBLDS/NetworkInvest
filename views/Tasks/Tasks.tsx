@@ -1,22 +1,23 @@
 
 import React, { useState, useEffect } from 'react';
-import { User } from '../../types';
+import { User, AppView } from '../../types';
 import { PLANS } from '../../constants';
 import { supabase } from '../../supabase';
 
 interface TasksProps {
   user: User;
   onCompleteTask: (reward: number) => void;
+  onViewChange?: (view: AppView) => void;
 }
 
-const Tasks: React.FC<TasksProps> = ({ user, onCompleteTask }) => {
+const Tasks: React.FC<TasksProps> = ({ user, onCompleteTask, onViewChange }) => {
   const [completedCount, setCompletedCount] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processStep, setProcessStep] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const activePlan = PLANS.find(p => p.id === user.activePlanId) || PLANS[0];
-  const rewardPerTask = activePlan.dailyReturn / activePlan.tasksPerDay;
+  const activePlan = PLANS.find(p => p.id === user.activePlanId);
+  const rewardPerTask = activePlan ? activePlan.dailyReturn / activePlan.tasksPerDay : 0;
 
   const steps = [
     "Conectando ao terminal financeiro...",
@@ -33,7 +34,7 @@ const Tasks: React.FC<TasksProps> = ({ user, onCompleteTask }) => {
 
   const fetchCompletedTasks = async () => {
     const today = new Date().toISOString().split('T')[0];
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('user_tasks')
       .select('id')
       .eq('user_id', user.id)
@@ -44,18 +45,16 @@ const Tasks: React.FC<TasksProps> = ({ user, onCompleteTask }) => {
   };
 
   const handleStartTask = async () => {
-    if (completedCount >= activePlan.tasksPerDay || isProcessing) return;
+    if (!activePlan || completedCount >= activePlan.tasksPerDay || isProcessing) return;
 
     setIsProcessing(true);
     setProcessStep(0);
 
-    // Efeito de passos
     for (let i = 0; i < steps.length; i++) {
       await new Promise(r => setTimeout(r, 1200));
       setProcessStep(i + 1);
     }
 
-    // Gravar no banco
     const { error } = await supabase.from('user_tasks').insert({
       user_id: user.id,
       reward: rewardPerTask,
@@ -70,7 +69,25 @@ const Tasks: React.FC<TasksProps> = ({ user, onCompleteTask }) => {
     setIsProcessing(false);
   };
 
-  if (loading) return <div className="p-10 text-center animate-pulse font-black text-emerald-600">CARREGANDO OPERAÇÕES...</div>;
+  if (loading) return <div className="p-10 text-center animate-pulse font-black text-emerald-600 uppercase text-xs tracking-widest">Sincronizando Terminal...</div>;
+
+  if (!activePlan) {
+    return (
+      <div className="p-6 flex flex-col items-center justify-center min-h-[80vh] text-center space-y-6">
+        <div className="w-24 h-24 bg-slate-100 rounded-[35px] flex items-center justify-center text-4xl shadow-inner animate-float">🔒</div>
+        <div className="space-y-2">
+          <h2 className="text-xl font-black text-slate-800 uppercase tracking-tighter italic">Terminal Bloqueado</h2>
+          <p className="text-xs text-slate-400 font-bold max-w-[200px] mx-auto leading-relaxed">Você não possui um plano de mineração ativo no momento.</p>
+        </div>
+        <button 
+          onClick={() => onViewChange?.(AppView.PLANS)}
+          className="bg-emerald-600 text-white font-black py-4 px-10 rounded-2xl shadow-xl shadow-emerald-100 uppercase text-[10px] tracking-widest active:scale-95 transition-all"
+        >
+          ADQUIRIR PLANO AGORA
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6 bg-slate-50 min-h-screen">
@@ -85,16 +102,16 @@ const Tasks: React.FC<TasksProps> = ({ user, onCompleteTask }) => {
             <p className="text-[9px] font-black text-emerald-600 uppercase mb-1">Status do Terminal</p>
             <div className="flex items-center space-x-2">
               <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
-              <span className="text-sm font-black text-slate-800">CONECTADO</span>
+              <span className="text-sm font-black text-slate-800">OPERACIONAL</span>
             </div>
           </div>
           <div className="text-right">
-            <p className="text-[9px] font-black text-slate-300 uppercase mb-1">Plano Atual</p>
+            <p className="text-[9px] font-black text-slate-300 uppercase mb-1">Ativo em</p>
             <p className="text-xs font-black text-slate-800 uppercase">{activePlan.name}</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 mb-2">
+        <div className="grid grid-cols-2 gap-4">
           <div className="bg-slate-50 rounded-2xl p-4">
             <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Tarefas de Hoje</p>
             <p className="text-lg font-black text-slate-800">{completedCount} / {activePlan.tasksPerDay}</p>
@@ -107,17 +124,17 @@ const Tasks: React.FC<TasksProps> = ({ user, onCompleteTask }) => {
       </div>
 
       {isProcessing ? (
-        <div className="bg-slate-900 rounded-[35px] p-8 text-white space-y-8 animate-in zoom-in duration-300">
+        <div className="bg-slate-900 rounded-[35px] p-8 text-white space-y-8 animate-in zoom-in duration-300 shadow-2xl">
           <div className="flex justify-center">
             <div className="w-20 h-20 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
           </div>
           <div className="text-center space-y-2">
-            <p className="text-emerald-400 font-mono text-xs animate-pulse tracking-widest uppercase">
-              {steps[processStep] || "Finalizando..."}
+            <p className="text-emerald-400 font-mono text-[10px] animate-pulse tracking-widest uppercase">
+              {steps[processStep] || "Processando Transação..."}
             </p>
-            <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+            <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
               <div 
-                className="h-full bg-emerald-500 transition-all duration-500" 
+                className="h-full bg-emerald-500 transition-all duration-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" 
                 style={{ width: `${(processStep / steps.length) * 100}%` }}
               ></div>
             </div>
@@ -126,21 +143,21 @@ const Tasks: React.FC<TasksProps> = ({ user, onCompleteTask }) => {
       ) : (
         <div className="space-y-4">
           {completedCount >= activePlan.tasksPerDay ? (
-            <div className="bg-emerald-50 border border-emerald-100 p-8 rounded-[35px] text-center space-y-3">
-              <div className="text-4xl">✅</div>
-              <h4 className="text-lg font-black text-emerald-900 uppercase">Cota Diária Concluída</h4>
-              <p className="text-xs text-emerald-700 font-medium">Você já realizou todas as operações disponíveis para seu plano hoje. Volte amanhã!</p>
+            <div className="bg-emerald-50 border border-emerald-100 p-8 rounded-[35px] text-center space-y-3 shadow-inner">
+              <div className="text-4xl">💎</div>
+              <h4 className="text-lg font-black text-emerald-900 uppercase italic">Operações Concluídas</h4>
+              <p className="text-[10px] text-emerald-700 font-black uppercase tracking-widest opacity-60">Volte amanhã para novos ganhos</p>
             </div>
           ) : (
             <button 
               onClick={handleStartTask}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white p-8 rounded-[35px] shadow-2xl shadow-emerald-200 active:scale-[0.97] transition-all group"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white p-8 rounded-[35px] shadow-2xl shadow-emerald-200 active:scale-[0.97] transition-all group border border-emerald-500"
             >
               <div className="flex flex-col items-center space-y-4">
-                <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center text-3xl group-hover:rotate-12 transition-transform">⚡</div>
+                <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center text-3xl group-hover:rotate-12 transition-transform shadow-inner">⚡</div>
                 <div className="text-center">
                   <p className="text-lg font-black uppercase tracking-tighter italic">Iniciar Operação {completedCount + 1}</p>
-                  <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest">Clique para processar no mercado</p>
+                  <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest">Executar Swap na Blockchain</p>
                 </div>
               </div>
             </button>
@@ -148,27 +165,6 @@ const Tasks: React.FC<TasksProps> = ({ user, onCompleteTask }) => {
         </div>
       )}
 
-      <div className="bg-white rounded-[32px] p-6 border border-slate-100 shadow-sm">
-        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Registro de Atividades</h3>
-        <div className="space-y-4">
-          {[...Array(activePlan.tasksPerDay)].map((_, i) => (
-            <div key={i} className={`flex items-center justify-between p-4 rounded-2xl border ${i < completedCount ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}>
-              <div className="flex items-center space-x-3">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-[10px] ${i < completedCount ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400'}`}>
-                  {i + 1}
-                </div>
-                <span className={`text-[11px] font-black uppercase ${i < completedCount ? 'text-emerald-900' : 'text-slate-400'}`}>
-                  {i < completedCount ? 'Operação Concluída' : 'Aguardando Início'}
-                </span>
-              </div>
-              <span className={`text-[10px] font-black ${i < completedCount ? 'text-emerald-600' : 'text-slate-300'}`}>
-                +{rewardPerTask.toFixed(2)} USDT
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-      
       <div className="h-20" />
     </div>
   );

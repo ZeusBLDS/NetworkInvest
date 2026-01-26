@@ -18,7 +18,8 @@ const LuckyWheelModal: React.FC<LuckyWheelModalProps> = ({ user, onClose, onWin 
   const prizes = [0.01, 0.02, 0.03, 0.05, 0.10, 0.01, 0.02, 0.05];
   const weights = [50, 25, 10, 5, 1, 5, 3, 1];
 
-  const hasActivePaidPlan = user.activePlanId && user.activePlanId !== 'vip0';
+  // VIP 0 agora é pago, então qualquer plano ativo permite o giro
+  const hasActivePlan = !!user.activePlanId;
 
   const handleSpin = async () => {
     if (spinning || result !== null) return;
@@ -26,24 +27,22 @@ const LuckyWheelModal: React.FC<LuckyWheelModalProps> = ({ user, onClose, onWin 
     setSpinning(true);
     setError(null);
 
-    // TRAVA IMEDIATA NO BANCO DE DADOS
-    const today = new Date().toISOString();
+    if (!hasActivePlan) {
+      setSpinning(false);
+      setError('Adquira um plano VIP para girar a roleta.');
+      return;
+    }
+
+    const today = new Date().toISOString().split('T')[0];
     const { data: profile } = await supabase.from('profiles').select('last_wheel_spin').eq('id', user.id).single();
     
-    if (profile?.last_wheel_spin && new Date(profile.last_wheel_spin).toDateString() === new Date().toDateString()) {
+    if (profile?.last_wheel_spin && new Date(profile.last_wheel_spin).toISOString().split('T')[0] === today) {
       setSpinning(false);
       setError('Você já girou hoje!');
       return;
     }
 
-    if (!hasActivePaidPlan) {
-      setSpinning(false);
-      setError('Exclusivo para VIP 1 ou superior.');
-      return;
-    }
-
-    // Marca no banco que o usuário iniciou o giro (Prevenir bug de clique rápido)
-    await supabase.from('profiles').update({ last_wheel_spin: today }).eq('id', user.id);
+    await supabase.from('profiles').update({ last_wheel_spin: new Date().toISOString() }).eq('id', user.id);
 
     const totalWeight = weights.reduce((acc, w) => acc + w, 0);
     let random = Math.random() * totalWeight;
@@ -111,13 +110,13 @@ const LuckyWheelModal: React.FC<LuckyWheelModalProps> = ({ user, onClose, onWin 
 
         {error && (
           <div className="mb-8 p-4 bg-red-50 border border-red-100 rounded-3xl text-center">
-            <p className="text-[10px] font-black text-red-600 uppercase">{error}</p>
+            <p className="text-[10px] font-black text-red-600 uppercase tracking-widest leading-tight">{error}</p>
           </div>
         )}
         
         {result !== null && (
-          <div className="mb-8 animate-bounce text-center bg-emerald-50 p-4 rounded-3xl border border-emerald-100 w-full">
-            <p className="text-[9px] font-black text-emerald-600 uppercase mb-1">PRÊMIO GANHO</p>
+          <div className="mb-8 animate-bounce text-center bg-emerald-50 p-4 rounded-3xl border border-emerald-100 w-full shadow-inner">
+            <p className="text-[9px] font-black text-emerald-600 uppercase mb-1">PRÊMIO CREDITADO</p>
             <p className="text-3xl font-black text-emerald-900">+{result.toFixed(2)} USDT</p>
           </div>
         )}
@@ -127,8 +126,8 @@ const LuckyWheelModal: React.FC<LuckyWheelModalProps> = ({ user, onClose, onWin 
           onClick={handleSpin} 
           className={`w-full py-5 rounded-3xl font-black text-sm transition-all shadow-xl uppercase tracking-[0.2em] ${
             spinning || result !== null
-            ? 'bg-slate-100 text-slate-300' 
-            : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-200'
+            ? 'bg-slate-100 text-slate-300 border border-slate-50' 
+            : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-200 border border-emerald-500'
           }`}
         >
           {spinning ? 'SORTEANDO...' : result !== null ? 'GIRO CONCLUÍDO' : 'INICIAR GIRO'}

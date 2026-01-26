@@ -13,15 +13,14 @@ const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate }) => 
   return (
     <div className="p-6 space-y-6 bg-white min-h-screen">
       <div className="mb-6">
-        <h2 className="text-2xl font-extrabold text-slate-800 tracking-tight">Planos de 90 Dias</h2>
+        <h2 className="text-2xl font-extrabold text-slate-800 tracking-tight">Nossos Planos</h2>
         <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Escolha a melhor opção para seu perfil</p>
       </div>
 
       <div className="space-y-6">
         {PLANS.map((plan) => {
-          const isVip0 = plan.id === 'vip0';
-          // O plano é atual se o ID bater OU se for VIP 0 e o usuário não tiver plano definido
-          const isCurrent = user.activePlanId === plan.id || (isVip0 && (!user.activePlanId || user.activePlanId === ''));
+          // O plano é atual apenas se o ID bater exatamente com o do usuário
+          const isCurrent = user.activePlanId === plan.id;
           const isPending = myDeposits.some(d => d.planId === plan.id && d.status === 'PENDING');
 
           return (
@@ -36,14 +35,14 @@ const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate }) => 
               <div className="flex justify-between items-start mb-6">
                 <div>
                   <h3 className="text-xl font-black text-slate-900 tracking-tighter uppercase">{plan.name}</h3>
-                  <p className="text-xs text-slate-400 font-bold">90 Dias</p>
+                  <p className="text-xs text-slate-400 font-bold">{plan.durationDays} Dias</p>
                 </div>
                 <div className="text-right">
                   <div className="flex items-baseline justify-end space-x-1">
                     <span className="text-2xl font-black text-slate-900">{plan.investment}</span>
                     <span className="text-[10px] font-black text-emerald-500 uppercase">USDT</span>
                   </div>
-                  <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Investimento</p>
+                  <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Custo de Adesão</p>
                 </div>
               </div>
 
@@ -58,17 +57,15 @@ const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate }) => 
                 </div>
               </div>
 
-              {!isVip0 && (
-                <div className="mb-6 space-y-2">
-                  <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
-                    <span className="text-emerald-500">Lucratividade</span>
-                    <span className="text-emerald-500">{plan.dailyPercent}% / Dia</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min(plan.dailyPercent * 5, 100)}%` }}></div>
-                  </div>
+              <div className="mb-6 space-y-2">
+                <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
+                  <span className="text-emerald-500">Lucratividade</span>
+                  <span className="text-emerald-500">{plan.dailyPercent}% / Dia</span>
                 </div>
-              )}
+                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min(plan.dailyPercent * 5, 100)}%` }}></div>
+                </div>
+              </div>
 
               <button
                 disabled={isCurrent || isPending}
@@ -79,7 +76,7 @@ const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate }) => 
                   'bg-emerald-600 text-white shadow-xl shadow-emerald-100 active:scale-95 hover:bg-emerald-700'
                 }`}
               >
-                {isCurrent ? 'PLANO ATIVO' : isPending ? 'AGUARDANDO APROVAÇÃO' : 'ATIVAR PLANO'}
+                {isCurrent ? 'PLANO ATIVO' : isPending ? 'AGUARDANDO APROVAÇÃO' : 'ADQUIRIR PLANO'}
               </button>
             </div>
           );

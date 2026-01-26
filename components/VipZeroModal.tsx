@@ -21,11 +21,11 @@ const VipZeroModal: React.FC<VipZeroModalProps> = ({ onActivate }) => {
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <span className="text-emerald-700 font-bold text-sm">💰 Ganho diário</span>
-              <span className="text-emerald-900 font-black">0,10 USDT</span>
+              <span className="text-emerald-900 font-black">0.30 USDT</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-emerald-700 font-bold text-sm">⏳ Validade</span>
-              <span className="text-emerald-900 font-black">90 dias</span>
+              <span className="text-emerald-900 font-black">30 dias</span>
             </div>
             <div className="flex justify-between items-center border-t border-emerald-200 pt-4">
               <span className="text-emerald-700 font-bold text-sm uppercase">Rendimento Total</span>

@@ -16,7 +16,7 @@ interface HomeProps {
 }
 
 const Home: React.FC<HomeProps> = ({ user, myDeposits, performCheckIn, onOpenWithdraw, onOpenDeposit, onOpenWheel }) => {
-  const activePlanName = PLANS.find(p => p.id === user.activePlanId)?.name || 'VIP 0';
+  const activePlanName = PLANS.find(p => p.id === user.activePlanId)?.name || 'Nenhum Plano Ativo';
   
   const docs = [
     { label: 'PDF Completo', url: 'https://www.dropbox.com/scl/fi/62z7x3pmvxo261dtw6u30/Network_Invest_PDF_Completo.pdf?rlkey=ud1fybfe5o4w2r3agnmkzg93k&st=ofi9inbd&dl=0', icon: '📄' },
@@ -45,9 +45,9 @@ const Home: React.FC<HomeProps> = ({ user, myDeposits, performCheckIn, onOpenWit
         </div>
       </div>
 
-      {/* Botão WhatsApp Grupo */}
+      {/* Botão WhatsApp Grupo - LINK ATUALIZADO */}
       <button 
-        onClick={() => window.open('https://chat.whatsapp.com/D9j8AAFWKom75KkKBTaFcz?mode=gi_t', '_blank')}
+        onClick={() => window.open('https://chat.whatsapp.com/FswIG8yXGycGZxnRTpy7qD?mode=gi_t', '_blank')}
         className="w-full bg-[#25D366] text-white rounded-[28px] p-5 shadow-lg shadow-green-100 flex items-center justify-between active:scale-[0.98] transition-all"
       >
         <div className="flex items-center space-x-4">
@@ -79,7 +79,9 @@ const Home: React.FC<HomeProps> = ({ user, myDeposits, performCheckIn, onOpenWit
             </div>
           </div>
           <div className="text-right">
-             <span className="text-[9px] bg-emerald-500 text-white px-3 py-1 rounded-lg font-black uppercase tracking-widest shadow-lg shadow-emerald-100">Ativo</span>
+             <span className={`text-[9px] ${user.activePlanId ? 'bg-emerald-500' : 'bg-slate-300'} text-white px-3 py-1 rounded-lg font-black uppercase tracking-widest shadow-lg shadow-emerald-100`}>
+               {user.activePlanId ? 'Ativo' : 'Nenhum'}
+             </span>
           </div>
         </div>
       </div>
