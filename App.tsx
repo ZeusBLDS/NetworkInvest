@@ -132,6 +132,49 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Lógica de Comissões Multinível
+  const distributeCommissions = async (buyerId: string, amount: number) => {
+    try {
+      // 1. Pegar quem comprou para saber quem é o indicador dele
+      const { data: buyer } = await supabase.from('profiles').select('referred_by').eq('id', buyerId).single();
+      if (!buyer || buyer.referred_by === 'Direto') return;
+
+      let currentReferrerCode = buyer.referred_by;
+
+      // Percorrer até 5 níveis
+      for (let level = 0; level < REFERRAL_RATES.length; level++) {
+        if (!currentReferrerCode || currentReferrerCode === 'Direto') break;
+
+        // Encontrar o perfil do padrinho deste nível
+        const { data: referrer } = await supabase.from('profiles')
+          .select('id, balance, network_earnings, referred_by')
+          .eq('referral_code', currentReferrerCode)
+          .single();
+
+        if (referrer) {
+          const commissionValue = amount * REFERRAL_RATES[level];
+          const newBalance = parseFloat(referrer.balance) + commissionValue;
+          const newNetworkEarnings = parseFloat(referrer.network_earnings || 0) + commissionValue;
+
+          // Atualizar padrinho
+          await supabase.from('profiles').update({
+            balance: newBalance,
+            network_earnings: newNetworkEarnings
+          }).eq('id', referrer.id);
+
+          console.log(`Nível ${level + 1}: Creditado ${commissionValue} USDT para ${currentReferrerCode}`);
+
+          // Subir para o próximo nível
+          currentReferrerCode = referrer.referred_by;
+        } else {
+          break; // Se não achou o padrinho, para a rede
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao distribuir comissões:", error);
+    }
+  };
+
   const updateBalance = async (amount: number, userId?: string) => {
     const id = userId || currentUser?.id;
     if (!id) return;
@@ -154,7 +197,6 @@ const App: React.FC = () => {
     const earningToday = 0.01;
     const today = new Date().toISOString();
     try {
-      // Fix: using checkInStreak instead of check_in_streak for currentUser (User type uses camelCase)
       const { data } = await supabase.from('profiles').update({
         balance: currentUser.balance + earningToday,
         last_check_in: today,
@@ -199,7 +241,6 @@ const App: React.FC = () => {
 
   const handleWithdrawSubmit = async (amount: number, wallet: string, method: 'USDT' | 'PIX') => {
     if (!currentUser) return;
-    // Via PIX: Taxa de 10%. Via USDT: GRÁTIS (sem taxa).
     const fee = method === 'PIX' ? amount * 0.10 : 0;
     
     await supabase.from('withdrawals').insert({
@@ -241,12 +282,19 @@ const App: React.FC = () => {
           onApproveDeposit={async (id) => {
             const dep = deposits.find(d => d.id === id);
             if (!dep) return;
+
+            // 1. Aprovar depósito
             await supabase.from('deposits').update({ status: 'APPROVED' }).eq('id', id);
+            
+            // 2. Ativar plano ou saldo
             if (dep.planId) {
               await supabase.from('profiles').update({ active_plan_id: dep.planId }).eq('id', dep.userId);
+              // 3. DISTRIBUIR COMISSÕES AGORA QUE O PLANO FOI PAGO
+              await distributeCommissions(dep.userId, dep.amount);
             } else {
               await updateBalance(dep.amount, dep.userId);
             }
+            
             fetchAdminData();
           }}
           onRejectDeposit={async (id) => {
@@ -278,6 +326,11 @@ const App: React.FC = () => {
           onAdjustBalance={async (uid, amt) => {
             const { data } = await supabase.from('profiles').select('balance').eq('id', uid).single();
             if (data) await supabase.from('profiles').update({ balance: parseFloat(data.balance) + amt }).eq('id', uid);
+            fetchAdminData();
+          }}
+          onUpdateReferrer={async (uid, newRef) => {
+            await supabase.from('profiles').update({ referred_by: newRef }).eq('id', uid);
+            alert('Indicador (Líder) atualizado com sucesso! O próximo plano que este usuário comprar contará para este líder.');
             fetchAdminData();
           }}
         />
