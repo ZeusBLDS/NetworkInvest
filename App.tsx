@@ -132,20 +132,16 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Lógica de Comissões Multinível
   const distributeCommissions = async (buyerId: string, amount: number) => {
     try {
-      // 1. Pegar quem comprou para saber quem é o indicador dele
       const { data: buyer } = await supabase.from('profiles').select('referred_by').eq('id', buyerId).single();
       if (!buyer || buyer.referred_by === 'Direto') return;
 
       let currentReferrerCode = buyer.referred_by;
 
-      // Percorrer até 5 níveis
       for (let level = 0; level < REFERRAL_RATES.length; level++) {
         if (!currentReferrerCode || currentReferrerCode === 'Direto') break;
 
-        // Encontrar o perfil do padrinho deste nível
         const { data: referrer } = await supabase.from('profiles')
           .select('id, balance, network_earnings, referred_by')
           .eq('referral_code', currentReferrerCode)
@@ -156,22 +152,18 @@ const App: React.FC = () => {
           const newBalance = parseFloat(referrer.balance) + commissionValue;
           const newNetworkEarnings = parseFloat(referrer.network_earnings || 0) + commissionValue;
 
-          // Atualizar padrinho
           await supabase.from('profiles').update({
             balance: newBalance,
             network_earnings: newNetworkEarnings
           }).eq('id', referrer.id);
 
-          console.log(`Nível ${level + 1}: Creditado ${commissionValue} USDT para ${currentReferrerCode}`);
-
-          // Subir para o próximo nível
           currentReferrerCode = referrer.referred_by;
         } else {
-          break; // Se não achou o padrinho, para a rede
+          break;
         }
       }
     } catch (error) {
-      console.error("Erro ao distribuir comissões:", error);
+      console.error("Erro comissões:", error);
     }
   };
 
@@ -281,15 +273,13 @@ const App: React.FC = () => {
           onClose={() => setCurrentView(AppView.ACCOUNT)}
           onApproveDeposit={async (id) => {
             const dep = deposits.find(d => d.id === id);
-            if (!dep) return;
+            // SEGURANÇA: Impedir dupla aprovação
+            if (!dep || dep.status !== 'PENDING') return;
 
-            // 1. Aprovar depósito
             await supabase.from('deposits').update({ status: 'APPROVED' }).eq('id', id);
             
-            // 2. Ativar plano ou saldo
             if (dep.planId) {
               await supabase.from('profiles').update({ active_plan_id: dep.planId }).eq('id', dep.userId);
-              // 3. DISTRIBUIR COMISSÕES AGORA QUE O PLANO FOI PAGO
               await distributeCommissions(dep.userId, dep.amount);
             } else {
               await updateBalance(dep.amount, dep.userId);
@@ -298,24 +288,31 @@ const App: React.FC = () => {
             fetchAdminData();
           }}
           onRejectDeposit={async (id) => {
+            const dep = deposits.find(d => d.id === id);
+            if (!dep || dep.status !== 'PENDING') return;
             await supabase.from('deposits').update({ status: 'REJECTED' }).eq('id', id);
             fetchAdminData();
           }}
           onApproveWithdraw={async (id) => {
+            const withs = withdrawals.find(w => w.id === id);
+            if (!withs || withs.status !== 'PENDING') return;
             await supabase.from('withdrawals').update({ status: 'APPROVED' }).eq('id', id);
             fetchAdminData();
           }}
           onRejectWithdraw={async (id) => {
              const withReq = withdrawals.find(w => w.id === id);
-             if (withReq) await updateBalance(withReq.amount, withReq.userId);
+             if (!withReq || withReq.status !== 'PENDING') return;
+             await updateBalance(withReq.amount, withReq.userId);
              await supabase.from('withdrawals').update({ status: 'REJECTED' }).eq('id', id);
              fetchAdminData();
           }}
           onUpdateStatus={async (uid, status) => {
+            // ADMIN ONLY via RLS
             await supabase.from('profiles').update({ status }).eq('id', uid);
             fetchAdminData();
           }}
           onDeleteUser={async (uid) => {
+             // ADMIN ONLY via RLS
              await supabase.from('profiles').delete().eq('id', uid);
              fetchAdminData();
           }}
@@ -330,7 +327,7 @@ const App: React.FC = () => {
           }}
           onUpdateReferrer={async (uid, newRef) => {
             await supabase.from('profiles').update({ referred_by: newRef }).eq('id', uid);
-            alert('Indicador (Líder) atualizado com sucesso! O próximo plano que este usuário comprar contará para este líder.');
+            alert('Líder atualizado!');
             fetchAdminData();
           }}
         />

@@ -1,5 +1,5 @@
 
--- 1. TABELA DE PERFIS
+-- 1. TABELA DE PERFIS (Reforçada)
 CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
   name TEXT,
@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   phone TEXT,
   referral_code TEXT UNIQUE,
   referred_by TEXT DEFAULT 'Direto',
-  balance DECIMAL(12,2) DEFAULT 0,
+  balance DECIMAL(12,2) DEFAULT 0 CHECK (balance >= 0), -- Impede saldo negativo por bug
   wallet_address TEXT,
   active_plan_id TEXT DEFAULT NULL,
   role TEXT DEFAULT 'USER', 
@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Índices para performance em buscas de rede
 CREATE INDEX IF NOT EXISTS idx_profiles_referral_code ON public.profiles(referral_code);
 CREATE INDEX IF NOT EXISTS idx_profiles_referred_by ON public.profiles(referred_by);
 
@@ -31,10 +32,10 @@ CREATE TABLE IF NOT EXISTS public.user_tasks (
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   reward DECIMAL(12,2) DEFAULT 0,
   plan_id TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTT DEFAULT NOW()
 );
 
--- 3. TABELA DE DEPÓSITOS (Incluindo Method)
+-- 3. TABELA DE DEPÓSITOS
 CREATE TABLE IF NOT EXISTS public.deposits (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -47,7 +48,7 @@ CREATE TABLE IF NOT EXISTS public.deposits (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 4. TABELA DE SAQUES (Incluindo Method)
+-- 4. TABELA DE SAQUES
 CREATE TABLE IF NOT EXISTS public.withdrawals (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -60,34 +61,57 @@ CREATE TABLE IF NOT EXISTS public.withdrawals (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 5. HABILITAR RLS
+-- 5. HABILITAR RLS (Segurança de Nível de Linha)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.deposits ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.withdrawals ENABLE ROW LEVEL SECURITY;
 
--- Políticas para usuários verem seus próprios dados
-DROP POLICY IF EXISTS "Own profiles" ON public.profiles;
-CREATE POLICY "Own profiles" ON public.profiles FOR SELECT USING (auth.uid() = id);
+-- 6. POLÍTICAS DE SEGURANÇA REFORÇADAS
 
-DROP POLICY IF EXISTS "Own tasks" ON public.user_tasks;
-CREATE POLICY "Own tasks" ON public.user_tasks FOR SELECT USING (auth.uid() = user_id);
+-- Funções auxiliares para checar Admin
+CREATE OR REPLACE FUNCTION public.is_admin() 
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles 
+    WHERE id = auth.uid() AND role = 'ADMIN'
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
-DROP POLICY IF EXISTS "Own deposits" ON public.deposits;
-CREATE POLICY "Own deposits" ON public.deposits FOR SELECT USING (auth.uid() = user_id);
+-- POLÍTICAS PARA PROFILES
+-- Usuário vê apenas seu perfil
+CREATE POLICY "Users can view own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
+-- Admin vê todos os perfis
+CREATE POLICY "Admins can view all profiles" ON public.profiles FOR SELECT USING (public.is_admin());
+-- Admin pode atualizar perfis (saldo, status, etc)
+CREATE POLICY "Admins can update all profiles" ON public.profiles FOR UPDATE USING (public.is_admin());
+-- Usuário só pode atualizar o próprio wallet_address e is_first_login (não o saldo!)
+CREATE POLICY "Users can update limited fields" ON public.profiles FOR UPDATE 
+USING (auth.uid() = id)
+WITH CHECK (
+  auth.uid() = id AND (
+    -- Aqui listamos os campos que o usuário COMUM pode alterar no próprio perfil
+    -- Impede que ele mude o próprio saldo ou role via console
+    (OLD.balance = NEW.balance) AND 
+    (OLD.role = NEW.role) AND
+    (OLD.referral_code = NEW.referral_code)
+  )
+);
 
-DROP POLICY IF EXISTS "Own withdrawals" ON public.withdrawals;
-CREATE POLICY "Own withdrawals" ON public.withdrawals FOR SELECT USING (auth.uid() = user_id);
+-- POLÍTICAS PARA DEPÓSITOS
+CREATE POLICY "Users view own deposits" ON public.deposits FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Admins view all deposits" ON public.deposits FOR SELECT USING (public.is_admin());
+CREATE POLICY "Users can create deposits" ON public.deposits FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Admins can update deposits" ON public.deposits FOR UPDATE USING (public.is_admin());
 
--- Permitir inserção
-DROP POLICY IF EXISTS "Insert own tasks" ON public.user_tasks;
-CREATE POLICY "Insert own tasks" ON public.user_tasks FOR INSERT WITH CHECK (auth.uid() = user_id);
+-- POLÍTICAS PARA SAQUES
+CREATE POLICY "Users view own withdrawals" ON public.withdrawals FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Admins view all withdrawals" ON public.withdrawals FOR SELECT USING (public.is_admin());
+CREATE POLICY "Users can create withdrawals" ON public.withdrawals FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Admins can update withdrawals" ON public.withdrawals FOR UPDATE USING (public.is_admin());
 
-DROP POLICY IF EXISTS "Insert own deposits" ON public.deposits;
-CREATE POLICY "Insert own deposits" ON public.deposits FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-DROP POLICY IF EXISTS "Insert own withdrawals" ON public.withdrawals;
-CREATE POLICY "Insert own withdrawals" ON public.withdrawals FOR INSERT WITH CHECK (auth.uid() = user_id);
-
--- POLÍTICA PARA ADMINS (Opcional: permite que usuários com role 'ADMIN' vejam tudo)
--- CREATE POLICY "Admins view all" ON public.profiles FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'ADMIN'));
+-- POLÍTICAS PARA TAREFAS
+CREATE POLICY "Users view own tasks" ON public.user_tasks FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own tasks" ON public.user_tasks FOR INSERT WITH CHECK (auth.uid() = user_id);

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User } from '../types';
 import { APP_CONFIG } from '../constants';
 
@@ -14,7 +14,41 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ user, onClose, onSubmit }
   const [amount, setAmount] = useState('');
   const [wallet, setWallet] = useState(method === 'USDT' ? (user.walletAddress || '') : '');
 
+  // Verificação de Horário e Dia de Saque
+  const [canWithdraw, setCanWithdraw] = useState(false);
+  const [timeMessage, setTimeMessage] = useState('');
+
+  useEffect(() => {
+    const checkTime = () => {
+      const now = new Date();
+      const day = now.getDay();
+      const hours = now.getHours();
+      
+      const isCorrectDay = APP_CONFIG.WITHDRAW_HOURS.DAYS.includes(day);
+      const isCorrectTime = hours >= APP_CONFIG.WITHDRAW_HOURS.START && hours < APP_CONFIG.WITHDRAW_HOURS.END;
+
+      if (isCorrectDay && isCorrectTime) {
+        setCanWithdraw(true);
+      } else {
+        setCanWithdraw(false);
+        if (!isCorrectDay) {
+          setTimeMessage('Saques apenas de Segunda a Sexta');
+        } else {
+          setTimeMessage(`Saques disponíveis das ${APP_CONFIG.WITHDRAW_HOURS.START}h às ${APP_CONFIG.WITHDRAW_HOURS.END}h`);
+        }
+      }
+    };
+
+    checkTime();
+    const interval = setInterval(checkTime, 30000); // Checa a cada 30s
+    return () => clearInterval(interval);
+  }, []);
+
   const handleWithdraw = () => {
+    if (!canWithdraw && user.role !== 'ADMIN') {
+      alert(`Atenção: ${timeMessage}`);
+      return;
+    }
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount < APP_CONFIG.MIN_WITHDRAWAL) {
       alert(`O saque mínimo é de ${APP_CONFIG.MIN_WITHDRAWAL} USDT`);
@@ -36,11 +70,20 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ user, onClose, onSubmit }
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 backdrop-blur-sm p-6">
       <div className="bg-white rounded-[40px] w-full max-w-sm p-8 shadow-2xl animate-in zoom-in duration-300 overflow-hidden relative">
-        <div className="absolute top-0 left-0 w-full h-1.5 bg-emerald-500/20"></div>
+        <div className={`absolute top-0 left-0 w-full h-1.5 ${canWithdraw ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
         
         <h2 className="text-xl font-black text-center text-gray-900 mb-6 uppercase tracking-tighter italic">
           SOLICITAR SAQUE
         </h2>
+
+        {/* Banner de Status de Horário */}
+        {!canWithdraw && (
+          <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl mb-6 text-center animate-pulse">
+            <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest leading-tight">
+              {timeMessage}
+            </p>
+          </div>
+        )}
 
         {/* Seletor de Método */}
         <div className="flex bg-slate-100 p-1 rounded-2xl mb-6">
@@ -104,9 +147,14 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ user, onClose, onSubmit }
           <div className="pt-2">
             <button 
               onClick={handleWithdraw}
-              className="w-full bg-emerald-600 text-white font-black py-5 rounded-2xl shadow-xl shadow-emerald-100 active:scale-95 transition-all uppercase text-xs tracking-[0.2em]"
+              disabled={!canWithdraw && user.role !== 'ADMIN'}
+              className={`w-full font-black py-5 rounded-2xl shadow-xl transition-all uppercase text-xs tracking-[0.2em] ${
+                canWithdraw || user.role === 'ADMIN'
+                ? 'bg-emerald-600 text-white shadow-emerald-100 active:scale-95'
+                : 'bg-slate-100 text-slate-300 cursor-not-allowed'
+              }`}
             >
-              CONFIRMAR SAQUE {method}
+              {canWithdraw || user.role === 'ADMIN' ? `CONFIRMAR SAQUE ${method}` : 'SAQUE INDISPONÍVEL'}
             </button>
           </div>
 

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, AppView } from '../../types';
-import { PLANS } from '../../constants';
+import { PLANS, APP_CONFIG } from '../../constants';
 import { supabase } from '../../supabase';
 
 interface TasksProps {
@@ -18,6 +18,11 @@ const Tasks: React.FC<TasksProps> = ({ user, onCompleteTask, onViewChange }) => 
 
   const activePlan = PLANS.find(p => p.id === user.activePlanId);
   const rewardPerTask = activePlan ? activePlan.dailyReturn / activePlan.tasksPerDay : 0;
+
+  // Verificação de Dia Útil
+  const now = new Date();
+  const currentDay = now.getDay();
+  const isWeekend = !APP_CONFIG.TASK_DAYS.includes(currentDay);
 
   const steps = [
     "Conectando ao terminal financeiro...",
@@ -45,6 +50,7 @@ const Tasks: React.FC<TasksProps> = ({ user, onCompleteTask, onViewChange }) => 
   };
 
   const handleStartTask = async () => {
+    if (isWeekend) return;
     if (!activePlan || completedCount >= activePlan.tasksPerDay || isProcessing) return;
 
     setIsProcessing(true);
@@ -101,8 +107,8 @@ const Tasks: React.FC<TasksProps> = ({ user, onCompleteTask, onViewChange }) => 
           <div>
             <p className="text-[9px] font-black text-emerald-600 uppercase mb-1">Status do Terminal</p>
             <div className="flex items-center space-x-2">
-              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
-              <span className="text-sm font-black text-slate-800">OPERACIONAL</span>
+              <span className={`w-2 h-2 ${isWeekend ? 'bg-amber-500' : 'bg-emerald-500 animate-ping'} rounded-full`}></span>
+              <span className="text-sm font-black text-slate-800">{isWeekend ? 'MERCADO FECHADO' : 'OPERACIONAL'}</span>
             </div>
           </div>
           <div className="text-right">
@@ -123,7 +129,22 @@ const Tasks: React.FC<TasksProps> = ({ user, onCompleteTask, onViewChange }) => 
         </div>
       </div>
 
-      {isProcessing ? (
+      {isWeekend ? (
+        <div className="bg-amber-50 border border-amber-100 p-8 rounded-[35px] text-center space-y-4 shadow-sm animate-in fade-in duration-500">
+          <div className="text-4xl">🗓️</div>
+          <div className="space-y-1">
+            <h4 className="text-sm font-black text-amber-900 uppercase italic">Fim de Semana</h4>
+            <p className="text-[10px] text-amber-700 font-bold uppercase tracking-widest leading-relaxed">
+              As operações de arbitragem ocorrem apenas de <span className="font-black">Segunda a Sexta-feira</span>, acompanhando o mercado global.
+            </p>
+          </div>
+          <div className="pt-2">
+            <div className="bg-amber-100/50 py-2 px-4 rounded-xl inline-block">
+               <p className="text-[9px] font-black text-amber-800 uppercase">Próxima abertura: Segunda-feira às 00:00</p>
+            </div>
+          </div>
+        </div>
+      ) : isProcessing ? (
         <div className="bg-slate-900 rounded-[35px] p-8 text-white space-y-8 animate-in zoom-in duration-300 shadow-2xl">
           <div className="flex justify-center">
             <div className="w-20 h-20 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>

@@ -60,5 +60,12 @@ export const APP_CONFIG = {
   MIN_WITHDRAWAL: 6,
   NETWORK: 'USDT (BSC / BEP20)',
   DEFAULT_REFERRER: 'Não informado',
-  DEPOSIT_WALLET: '0xc68b8357ca00a27781630d341096bc54e4c4b30f'
+  DEPOSIT_WALLET: '0xc68b8357ca00a27781630d341096bc54e4c4b30f',
+  // Regras de Horário
+  WITHDRAW_HOURS: {
+    START: 17,
+    END: 22,
+    DAYS: [1, 2, 3, 4, 5] // Segunda a Sexta
+  },
+  TASK_DAYS: [1, 2, 3, 4, 5] // Segunda a Sexta
 };
