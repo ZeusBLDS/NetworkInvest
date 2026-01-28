@@ -14,16 +14,25 @@ interface AccountProps {
 const Account: React.FC<AccountProps> = ({ user, onLogout, notifications, onUpdateUser, onViewChange }) => {
   const [wallet, setWallet] = useState(user.walletAddress || '');
   const [showNotifications, setShowNotifications] = useState(false);
+  const whatsappLink = "https://chat.whatsapp.com/DrML9fOcyOQ5IIi2MDnueA?mode=gi_t"; 
 
   const saveWallet = () => {
     onUpdateUser({ ...user, walletAddress: wallet });
     alert('Carteira salva com sucesso!');
   };
 
+  const copyId = () => {
+    navigator.clipboard.writeText(user.referralCode);
+    alert('ID de Ativação copiado!');
+  };
+
+  // Trava de segurança: Se for o e-mail master, ele é ADMIN por padrão no código
+  const isAdmin = user.role === 'ADMIN' || user.email === 'master@networkinvest.com';
+
   return (
-    <div className="p-6 space-y-6 animate-in fade-in duration-500">
+    <div className="p-6 space-y-6 animate-in fade-in duration-500 bg-slate-50 min-h-screen">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-black text-slate-900 uppercase italic tracking-tighter">CONTA</h2>
+        <h2 className="text-2xl font-black text-slate-900 uppercase italic tracking-tighter">MINHA CONTA</h2>
         <button 
           onClick={() => setShowNotifications(!showNotifications)}
           className="relative w-12 h-12 bg-white border border-slate-100 rounded-2xl flex items-center justify-center text-slate-500 shadow-sm active:scale-90 transition-all"
@@ -53,35 +62,70 @@ const Account: React.FC<AccountProps> = ({ user, onLogout, notifications, onUpda
         </div>
       )}
 
-      {/* Admin Quick Access - O BOTÃO ESTÁ AQUI ABAIXO */}
-      {user.role === 'ADMIN' && (
+      {/* ADMIN PANEL - TRAVA DE SEGURANÇA APLICADA AQUI */}
+      {isAdmin && (
         <button 
           onClick={() => onViewChange(AppView.ADMIN)}
-          className="w-full bg-slate-900 p-6 rounded-[35px] text-white flex items-center justify-between shadow-2xl relative overflow-hidden active:scale-[0.97] transition-all group border border-white/5"
+          className="w-full bg-slate-900 p-6 rounded-[35px] text-white flex items-center justify-between shadow-2xl relative overflow-hidden active:scale-[0.97] transition-all group border border-emerald-500/30"
         >
           <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/20 rounded-full -mr-8 -mt-8 blur-2xl group-hover:scale-150 transition-transform"></div>
           <div className="flex items-center space-x-5 relative z-10">
-            <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-2xl shadow-inner">🔐</div>
+            <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-2xl shadow-inner border border-white/5">🔐</div>
             <div className="text-left">
-              <p className="text-[10px] font-black uppercase opacity-50 tracking-widest mb-1">Painel Master</p>
-              <p className="font-black italic text-lg tracking-tighter">ADMINISTRATIVO</p>
+              <p className="text-[10px] font-black uppercase text-emerald-400 tracking-widest mb-1">Acesso Master</p>
+              <p className="font-black italic text-lg tracking-tighter">PAINEL ADMINISTRATIVO</p>
             </div>
           </div>
           <svg className="w-6 h-6 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
         </button>
       )}
 
+      {/* ID DE ATIVAÇÃO ULTRA VISÍVEL */}
+      <div className="bg-white rounded-[40px] p-8 border-4 border-emerald-500/10 shadow-sm relative overflow-hidden text-center">
+        <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-emerald-50 rounded-full blur-3xl opacity-50"></div>
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Seu ID Único de Ativação</p>
+        <div className="flex flex-col items-center space-y-4">
+           <h4 className="text-5xl font-black text-slate-900 tracking-tighter italic select-all">
+             {user.referralCode}
+           </h4>
+           <button 
+             onClick={copyId}
+             className="bg-emerald-500 text-slate-900 font-black py-2.5 px-8 rounded-xl text-[9px] uppercase tracking-widest active:scale-95 transition-all shadow-lg shadow-emerald-200"
+           >
+             Copiar Código de Pagamento
+           </button>
+        </div>
+        <p className="text-[8px] text-slate-400 font-bold uppercase mt-5 leading-relaxed">
+          * Use este ID na descrição do seu pagamento <br/>para garantir a <span className="text-emerald-600 font-black">ativação automática</span> do seu plano.
+        </p>
+      </div>
+
+      {/* BOTÃO SUPORTE PERMANENTE */}
+      <button 
+        onClick={() => window.open(whatsappLink, '_blank')}
+        className="w-full bg-[#25D366] text-white p-6 rounded-[35px] flex items-center justify-between shadow-lg shadow-green-100 active:scale-95 transition-all"
+      >
+        <div className="flex items-center space-x-4">
+          <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-xl">📱</div>
+          <div className="text-left">
+            <p className="text-[10px] font-black uppercase text-white/70 tracking-widest">Suporte 24h</p>
+            <p className="font-black uppercase italic tracking-tight">Grupo de Suporte VIP</p>
+          </div>
+        </div>
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+      </button>
+
       {/* User Card */}
       <div className="bg-white rounded-[35px] p-7 border border-slate-100 shadow-sm flex items-center space-x-5">
-        <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-[24px] flex items-center justify-center font-black text-2xl uppercase shadow-inner">
+        <div className="w-16 h-16 bg-slate-900 text-emerald-500 rounded-[24px] flex items-center justify-center font-black text-2xl uppercase shadow-inner border border-emerald-500/20">
           {user.name.charAt(0)}
         </div>
         <div>
           <h3 className="text-lg font-black text-slate-800 italic tracking-tighter uppercase">{user.name}</h3>
           <p className="text-[10px] text-slate-400 font-bold uppercase">{user.email}</p>
           <div className="flex items-center space-x-2 mt-1">
-             <span className={`w-2 h-2 rounded-full ${user.role === 'ADMIN' ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
-             <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">{user.role} ATIVO</span>
+             <span className={`w-2 h-2 rounded-full ${isAdmin ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></span>
+             <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">{isAdmin ? 'ADMINISTRADOR ATIVO' : 'MEMBRO ATIVO'}</span>
           </div>
         </div>
       </div>
@@ -101,7 +145,7 @@ const Account: React.FC<AccountProps> = ({ user, onLogout, notifications, onUpda
         />
         <button 
           onClick={saveWallet}
-          className="w-full bg-emerald-600 text-white font-black py-4 rounded-2xl active:scale-95 transition-all text-[11px] uppercase tracking-widest shadow-lg shadow-emerald-500/20"
+          className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl active:scale-95 transition-all text-[11px] uppercase tracking-widest shadow-xl"
         >
           ATUALIZAR CARTEIRA
         </button>
@@ -118,7 +162,7 @@ const Account: React.FC<AccountProps> = ({ user, onLogout, notifications, onUpda
       </div>
 
       <div className="text-center pt-8">
-        <p className="text-[9px] text-slate-300 font-black uppercase tracking-[0.4em]">Network Invest v3.1.0-Gold</p>
+        <p className="text-[9px] text-slate-300 font-black uppercase tracking-[0.4em]">Network Invest v3.2.0-Master</p>
       </div>
     </div>
   );
