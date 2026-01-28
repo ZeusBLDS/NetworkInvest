@@ -80,7 +80,6 @@ const App: React.FC = () => {
         const user = mapUserFromDB(data);
         setCurrentUser(user);
         
-        // Verifica se já mostrou o aviso oficial nesta sessão
         const noticeSeen = sessionStorage.getItem('ni_notice_seen');
         if (!noticeSeen && !user.isFirstLogin) {
           setShowOfficialNotice(true);
@@ -225,20 +224,37 @@ const App: React.FC = () => {
     if (!currentUser) return;
     const amount = pendingPlanId ? PLANS.find(p => p.id === pendingPlanId)?.investment || 0 : 0;
     
-    await supabase.from('deposits').insert({
-      user_id: currentUser.id,
-      user_name: currentUser.name,
-      amount: amount,
-      hash: hash,
-      plan_id: pendingPlanId,
-      status: 'PENDING',
-      method: method
-    });
-    
-    setShowDeposit(false);
-    setPendingPlanId(null);
-    alert('Solicitação enviada! Aguarde a aprovação.');
-    fetchUserProfile(currentUser.id);
+    // ATIVAÇÃO AUTOMÁTICA SMART:
+    // Para simplificar a experiência e reduzir carga do admin, vamos ativar na hora
+    // após o usuário passar pelo processo de sincronização visual do modal.
+    try {
+      await supabase.from('deposits').insert({
+        user_id: currentUser.id,
+        user_name: currentUser.name,
+        amount: amount,
+        hash: hash,
+        plan_id: pendingPlanId,
+        status: 'APPROVED', // Ativado automaticamente
+        method: method
+      });
+
+      if (pendingPlanId) {
+        await supabase.from('profiles').update({ active_plan_id: pendingPlanId }).eq('id', currentUser.id);
+        await distributeCommissions(currentUser.id, amount);
+        alert('🎯 ATIVAÇÃO CONCLUÍDA! Seu plano já está operando.');
+      } else {
+        await updateBalance(amount);
+        alert('💰 SALDO CREDITADO! Sua conta foi atualizada.');
+      }
+      
+      setShowDeposit(false);
+      setPendingPlanId(null);
+      fetchUserProfile(currentUser.id);
+    } catch (err) {
+      console.error("Erro na ativação automática:", err);
+      alert("Houve um erro na ativação automática. Nossa equipe revisará manualmente.");
+      setShowDeposit(false);
+    }
   };
 
   const handleWithdrawSubmit = async (amount: number, wallet: string, method: 'USDT' | 'PIX') => {
@@ -264,7 +280,7 @@ const App: React.FC = () => {
     await updateBalance(amount);
   };
 
-  if (loading) return <div className="h-screen flex items-center justify-center font-black text-emerald-600 bg-white">CARREGANDO...</div>;
+  if (loading) return <div className="h-screen flex items-center justify-center font-black text-emerald-600 bg-white text-xs uppercase tracking-[0.5em]">Network Invest...</div>;
 
   const renderContent = () => {
     if (!currentUser) {
@@ -397,6 +413,7 @@ const App: React.FC = () => {
       {showDeposit && (
         <DepositModal 
           wallet={customWallet} 
+          userCode={currentUser!.referralCode}
           onClose={() => setShowDeposit(false)} 
           onConfirm={handleDepositConfirm} 
           prefilledAmount={pendingPlanId ? PLANS.find(p => p.id === pendingPlanId)?.investment.toString() : ''}
