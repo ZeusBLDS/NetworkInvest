@@ -108,7 +108,7 @@ const Tasks: React.FC<TasksProps> = ({ user, onCompleteTask, onViewChange }) => 
             <p className="text-[9px] font-black text-emerald-600 uppercase mb-1">Status do Terminal</p>
             <div className="flex items-center space-x-2">
               <span className={`w-2 h-2 ${isWeekend ? 'bg-amber-500' : 'bg-emerald-500 animate-ping'} rounded-full`}></span>
-              <span className="text-sm font-black text-slate-800">{isWeekend ? 'MERCADO FECHADO' : 'OPERACIONAL'}</span>
+              <span className="text-sm font-black text-slate-800">{isWeekend ? 'FECHADO (FDS)' : 'OPERACIONAL'}</span>
             </div>
           </div>
           <div className="text-right">
@@ -133,14 +133,14 @@ const Tasks: React.FC<TasksProps> = ({ user, onCompleteTask, onViewChange }) => 
         <div className="bg-amber-50 border border-amber-100 p-8 rounded-[35px] text-center space-y-4 shadow-sm animate-in fade-in duration-500">
           <div className="text-4xl">🗓️</div>
           <div className="space-y-1">
-            <h4 className="text-sm font-black text-amber-900 uppercase italic">Fim de Semana</h4>
+            <h4 className="text-sm font-black text-amber-900 uppercase italic">Mercado Fechado</h4>
             <p className="text-[10px] text-amber-700 font-bold uppercase tracking-widest leading-relaxed">
-              As operações de arbitragem ocorrem apenas de <span className="font-black">Segunda a Sexta-feira</span>, acompanhando o mercado global.
+              Tarefas disponíveis somente de <span className="font-black">Segunda a Sexta-feira</span>. No Sábado e Domingo não há tarefas.
             </p>
           </div>
           <div className="pt-2">
-            <div className="bg-amber-100/50 py-2 px-4 rounded-xl inline-block">
-               <p className="text-[9px] font-black text-amber-800 uppercase">Próxima abertura: Segunda-feira às 00:00</p>
+            <div className="bg-amber-100/50 py-2 px-4 rounded-xl inline-block border border-amber-200">
+               <p className="text-[8px] font-black text-amber-800 uppercase tracking-widest">🚀 ORGANIZAÇÃO E TRANSPARÊNCIA</p>
             </div>
           </div>
         </div>

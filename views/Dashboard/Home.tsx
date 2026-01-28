@@ -45,7 +45,29 @@ const Home: React.FC<HomeProps> = ({ user, myDeposits, performCheckIn, onOpenWit
         </div>
       </div>
 
-      {/* Botão WhatsApp Grupo - LINK ATUALIZADO */}
+      {/* Informativo Oficial Card */}
+      <div className="bg-white border-2 border-emerald-500/10 rounded-[32px] p-5 shadow-sm relative overflow-hidden">
+        <div className="flex items-center space-x-3 mb-4">
+           <span className="text-xl">📢</span>
+           <h4 className="text-[11px] font-black text-slate-800 uppercase italic tracking-tight">Informativo Oficial NI</h4>
+        </div>
+        <div className="space-y-3">
+          <div className="flex items-start space-x-2">
+            <span className="text-emerald-500 text-xs mt-0.5">⏱</span>
+            <p className="text-[10px] font-bold text-slate-500 leading-relaxed uppercase">
+              <span className="text-slate-900">SAQUES:</span> Seg-Sex, 17h às 22h.
+            </p>
+          </div>
+          <div className="flex items-start space-x-2">
+            <span className="text-emerald-500 text-xs mt-0.5">🎯</span>
+            <p className="text-[10px] font-bold text-slate-500 leading-relaxed uppercase">
+              <span className="text-slate-900">TAREFAS:</span> Apenas dias úteis.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Botão WhatsApp Grupo */}
       <button 
         onClick={() => window.open('https://chat.whatsapp.com/FswIG8yXGycGZxnRTpy7qD?mode=gi_t', '_blank')}
         className="w-full bg-[#25D366] text-white rounded-[28px] p-5 shadow-lg shadow-green-100 flex items-center justify-between active:scale-[0.98] transition-all"
@@ -66,7 +88,7 @@ const Home: React.FC<HomeProps> = ({ user, myDeposits, performCheckIn, onOpenWit
         </svg>
       </button>
 
-      {/* Plano Ativo - Dinâmico */}
+      {/* Plano Ativo */}
       <div className="space-y-3">
         <div className="bg-white border border-slate-100 p-5 rounded-[28px] flex items-center justify-between shadow-sm relative overflow-hidden">
           <div className="flex items-center space-x-4">

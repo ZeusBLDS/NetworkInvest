@@ -16,6 +16,7 @@ import WelcomeModal from './components/WelcomeModal';
 import WithdrawModal from './components/WithdrawModal';
 import DepositModal from './components/DepositModal';
 import LuckyWheelModal from './components/LuckyWheelModal';
+import OfficialNoticeModal from './components/OfficialNoticeModal';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.LOGIN);
@@ -30,6 +31,7 @@ const App: React.FC = () => {
   const [myDeposits, setMyDeposits] = useState<DepositRequest[]>([]);
 
   const [showWelcome, setShowWelcome] = useState(false);
+  const [showOfficialNotice, setShowOfficialNotice] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [showDeposit, setShowDeposit] = useState(false);
   const [showWheel, setShowWheel] = useState(false);
@@ -77,6 +79,13 @@ const App: React.FC = () => {
       if (data) {
         const user = mapUserFromDB(data);
         setCurrentUser(user);
+        
+        // Verifica se já mostrou o aviso oficial nesta sessão
+        const noticeSeen = sessionStorage.getItem('ni_notice_seen');
+        if (!noticeSeen && !user.isFirstLogin) {
+          setShowOfficialNotice(true);
+        }
+
         const { data: deps } = await supabase.from('deposits').select('*').eq('user_id', userId).order('created_at', { ascending: false });
         if (deps) setMyDeposits(deps.map((req: any) => ({
           id: req.id, userId: req.user_id, userName: req.user_name,
@@ -209,6 +218,7 @@ const App: React.FC = () => {
     await supabase.auth.signOut();
     setCurrentUser(null);
     setCurrentView(AppView.LOGIN);
+    sessionStorage.removeItem('ni_notice_seen');
   };
 
   const handleDepositConfirm = async (hash: string, method: 'USDT' | 'PIX') => {
@@ -273,18 +283,14 @@ const App: React.FC = () => {
           onClose={() => setCurrentView(AppView.ACCOUNT)}
           onApproveDeposit={async (id) => {
             const dep = deposits.find(d => d.id === id);
-            // SEGURANÇA: Impedir dupla aprovação
             if (!dep || dep.status !== 'PENDING') return;
-
             await supabase.from('deposits').update({ status: 'APPROVED' }).eq('id', id);
-            
             if (dep.planId) {
               await supabase.from('profiles').update({ active_plan_id: dep.planId }).eq('id', dep.userId);
               await distributeCommissions(dep.userId, dep.amount);
             } else {
               await updateBalance(dep.amount, dep.userId);
             }
-            
             fetchAdminData();
           }}
           onRejectDeposit={async (id) => {
@@ -307,12 +313,10 @@ const App: React.FC = () => {
              fetchAdminData();
           }}
           onUpdateStatus={async (uid, status) => {
-            // ADMIN ONLY via RLS
             await supabase.from('profiles').update({ status }).eq('id', uid);
             fetchAdminData();
           }}
           onDeleteUser={async (uid) => {
-             // ADMIN ONLY via RLS
              await supabase.from('profiles').delete().eq('id', uid);
              fetchAdminData();
           }}
@@ -381,6 +385,14 @@ const App: React.FC = () => {
       {renderContent()}
       
       {showWelcome && <WelcomeModal onClose={() => setShowWelcome(false)} />}
+      {showOfficialNotice && (
+        <OfficialNoticeModal 
+          onClose={() => { 
+            setShowOfficialNotice(false); 
+            sessionStorage.setItem('ni_notice_seen', 'true'); 
+          }} 
+        />
+      )}
       {showWithdraw && <WithdrawModal user={currentUser!} onClose={() => setShowWithdraw(false)} onSubmit={handleWithdrawSubmit} />}
       {showDeposit && (
         <DepositModal 

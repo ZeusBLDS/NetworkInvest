@@ -32,9 +32,9 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ user, onClose, onSubmit }
       } else {
         setCanWithdraw(false);
         if (!isCorrectDay) {
-          setTimeMessage('Saques apenas de Segunda a Sexta');
+          setTimeMessage('SAQUES APENAS DE SEGUNDA A SEXTA');
         } else {
-          setTimeMessage(`Saques disponíveis das ${APP_CONFIG.WITHDRAW_HOURS.START}h às ${APP_CONFIG.WITHDRAW_HOURS.END}h`);
+          setTimeMessage(`HORÁRIO DE SAQUE: ${APP_CONFIG.WITHDRAW_HOURS.START}H ÀS ${APP_CONFIG.WITHDRAW_HOURS.END}H`);
         }
       }
     };
@@ -46,7 +46,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ user, onClose, onSubmit }
 
   const handleWithdraw = () => {
     if (!canWithdraw && user.role !== 'ADMIN') {
-      alert(`Atenção: ${timeMessage}`);
+      alert(`⚠️ ATENÇÃO:\n\n${timeMessage}\n\nSolicitações fora do horário não serão processadas.`);
       return;
     }
     const numAmount = parseFloat(amount);
@@ -68,7 +68,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ user, onClose, onSubmit }
   const currentFee = method === 'PIX' ? 0.10 : 0;
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 backdrop-blur-sm p-6">
+    <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 backdrop-blur-sm p-6">
       <div className="bg-white rounded-[40px] w-full max-w-sm p-8 shadow-2xl animate-in zoom-in duration-300 overflow-hidden relative">
         <div className={`absolute top-0 left-0 w-full h-1.5 ${canWithdraw ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
         
@@ -79,8 +79,9 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ user, onClose, onSubmit }
         {/* Banner de Status de Horário */}
         {!canWithdraw && (
           <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl mb-6 text-center animate-pulse">
-            <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest leading-tight">
-              {timeMessage}
+            <p className="text-[9px] font-black text-amber-700 uppercase tracking-widest leading-tight">
+              {timeMessage}<br/>
+              <span className="opacity-60">Solicitações fora do horário não serão processadas</span>
             </p>
           </div>
         )}
