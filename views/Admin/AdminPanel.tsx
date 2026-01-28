@@ -27,11 +27,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   onApproveDeposit, onRejectDeposit, onApproveWithdraw, onRejectWithdraw,
   onUpdateStatus, onDeleteUser, onGivePlan, onAdjustBalance, onUpdateReferrer
 }) => {
-  const [activeTab, setActiveTab] = useState<'DASH' | 'USERS' | 'FINANCE' | 'CONFIG'>('DASH');
+  const [activeTab, setActiveTab] = useState<'DASH' | 'USERS' | 'FINANCE' | 'CONFIG' | 'SECURITY'>('DASH');
   const [financeSubTab, setFinanceSubTab] = useState<'DEPOSITS' | 'WITHDRAWS'>('DEPOSITS');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUserNetwork, setSelectedUserNetwork] = useState<string | null>(null);
   const [networkData, setNetworkData] = useState<any>(null);
+  
+  // States para troca de senha
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isUpdatingPass, setIsUpdatingPass] = useState(false);
 
   const filteredUsers = users.filter(u => 
     u.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -55,6 +60,29 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
+  const handleUpdateOwnPassword = async () => {
+    if (!newPassword || newPassword.length < 6) {
+      alert("A senha deve ter no mínimo 6 caracteres.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      alert("As senhas não coincidem.");
+      return;
+    }
+
+    setIsUpdatingPass(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    
+    if (error) {
+      alert("Erro ao atualizar senha: " + error.message);
+    } else {
+      alert("Sua senha de Administrador foi alterada com sucesso!");
+      setNewPassword('');
+      setConfirmPassword('');
+    }
+    setIsUpdatingPass(false);
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 pb-20">
       <div className="p-6 bg-slate-900 text-white flex items-center justify-between sticky top-0 z-50">
@@ -72,6 +100,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           { id: 'DASH', label: 'Dashboard', icon: '📊' },
           { id: 'USERS', label: 'Usuários', icon: '👤' },
           { id: 'FINANCE', label: 'Financeiro', icon: '💰' },
+          { id: 'SECURITY', label: 'Segurança', icon: '🔐' },
           { id: 'CONFIG', label: 'Ajustes', icon: '⚙️' }
         ].map((tab) => (
           <button 
@@ -182,6 +211,53 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                   )}
                </div>
              ))}
+          </div>
+        )}
+
+        {activeTab === 'SECURITY' && (
+          <div className="space-y-6">
+            <div className="bg-white p-8 rounded-[40px] border-2 border-slate-50 shadow-sm">
+              <div className="text-center mb-8">
+                <div className="w-16 h-16 bg-amber-100 rounded-3xl flex items-center justify-center mx-auto mb-4 text-2xl">🔐</div>
+                <h3 className="text-lg font-black text-slate-800 uppercase italic tracking-tighter">Trocar Minha Senha</h3>
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Atualize sua senha de administrador</p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">Nova Senha</label>
+                  <input 
+                    type="password" 
+                    className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-100 font-bold text-sm outline-none focus:border-emerald-500 transition-all"
+                    placeholder="Mínimo 6 caracteres"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">Confirmar Nova Senha</label>
+                  <input 
+                    type="password" 
+                    className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-100 font-bold text-sm outline-none focus:border-emerald-500 transition-all"
+                    placeholder="Repita a nova senha"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                  />
+                </div>
+                
+                <button 
+                  onClick={handleUpdateOwnPassword}
+                  disabled={isUpdatingPass}
+                  className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl uppercase text-[10px] tracking-widest shadow-xl active:scale-95 transition-all disabled:opacity-50"
+                >
+                  {isUpdatingPass ? 'PROCESSANDO...' : 'ATUALIZAR MINHA SENHA'}
+                </button>
+
+                <p className="text-[8px] text-center text-slate-400 font-bold uppercase leading-relaxed mt-4">
+                  * Como o e-mail master@networkinvest.com é fictício, esta é a única forma de recuperar seu acesso caso esqueça a senha.
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
