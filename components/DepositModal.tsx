@@ -18,7 +18,7 @@ const DepositModal: React.FC<DepositModalProps> = ({ onClose, onConfirm, prefill
   const [verifyText, setVerifyText] = useState('');
 
   const isPlanPurchase = prefilledAmount !== '';
-  const pixKey = "b756b40c-8869-42a3-bd58-90aee532ca2f"; 
+  const pixKey = "ebb7e330-b7e2-4ea2-8299-86fc46858cb8"; 
 
   useEffect(() => {
     setAmount(prefilledAmount);
