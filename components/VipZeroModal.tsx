@@ -1,11 +1,14 @@
 
 import React from 'react';
+import { APP_CONFIG } from '../constants';
 
 interface VipZeroModalProps {
   onActivate: () => void;
 }
 
 const VipZeroModal: React.FC<VipZeroModalProps> = ({ onActivate }) => {
+  const minLimit = APP_CONFIG.MIN_WITHDRAWAL;
+
   return (
     <div className="fixed inset-0 z-[110] flex items-end justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="bg-white rounded-t-[40px] w-full max-w-md p-8 animate-in slide-in-from-bottom duration-500 shadow-[0_-20px_50px_rgba(0,0,0,0.2)]">
@@ -38,7 +41,7 @@ const VipZeroModal: React.FC<VipZeroModalProps> = ({ onActivate }) => {
         
         <div className="bg-slate-900 border border-emerald-500/30 p-5 rounded-[25px] mb-8">
            <p className="text-[9px] text-emerald-400 font-black uppercase text-center leading-relaxed">
-             Para sacar este valor e seus lucros futuros, você precisará atingir o mínimo de <span className="text-white underline">9.00 USDT</span> com nossos planos VIP.
+             Para sacar este valor e seus lucros futuros, você precisará atingir o mínimo de <span className="text-white underline">{minLimit.toFixed(2)} USDT</span> com nossos planos VIP.
            </p>
         </div>
         
