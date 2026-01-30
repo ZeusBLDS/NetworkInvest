@@ -37,7 +37,7 @@ const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate }) => 
 
               {isVipZero && !isCurrent && (
                 <div className="absolute top-4 right-6 bg-amber-100 text-amber-700 text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest z-10">
-                  INICIANTE
+                  ESTÁGIO GRÁTIS
                 </div>
               )}
 
@@ -51,7 +51,7 @@ const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate }) => 
                 </div>
                 <div className="text-right">
                   <div className="flex items-baseline justify-end space-x-1">
-                    <span className="text-3xl font-black text-slate-900">{plan.investment}</span>
+                    <span className="text-3xl font-black text-slate-900">{plan.investment.toFixed(2)}</span>
                     <span className={`text-xs font-black uppercase ${isVipZero ? 'text-amber-500' : 'text-emerald-500'}`}>USDT</span>
                   </div>
                   <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Adesão</p>
@@ -69,15 +69,17 @@ const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate }) => 
                 </div>
               </div>
 
-              <div className="mb-8 space-y-2.5">
-                <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
-                  <span className={isVipZero ? 'text-amber-600' : 'text-emerald-600'}>Rentabilidade</span>
-                  <span className={isVipZero ? 'text-amber-600' : 'text-emerald-600'}>{plan.dailyPercent}% / Dia</span>
+              {!isVipZero && (
+                <div className="mb-8 space-y-2.5">
+                  <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
+                    <span className="text-emerald-600">Rentabilidade</span>
+                    <span className="text-emerald-600">{plan.dailyPercent}% / Dia</span>
+                  </div>
+                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden p-0.5 shadow-inner">
+                    <div className={`h-full rounded-full transition-all duration-1000 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]`} style={{ width: `${Math.min(plan.dailyPercent * 5, 100)}%` }}></div>
+                  </div>
                 </div>
-                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden p-0.5 shadow-inner">
-                  <div className={`h-full rounded-full transition-all duration-1000 ${isVipZero ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]'}`} style={{ width: `${Math.min(plan.dailyPercent * 5, 100)}%` }}></div>
-                </div>
-              </div>
+              )}
 
               <button
                 disabled={isCurrent || isPending}
@@ -90,7 +92,7 @@ const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate }) => 
                     : 'bg-emerald-600 text-white shadow-xl shadow-emerald-100 active:scale-95 hover:bg-emerald-700'
                 }`}
               >
-                {isCurrent ? 'PLANO ATUAL' : isPending ? 'VALIDANDO HASH...' : 'ADQUIRIR AGORA'}
+                {isCurrent ? 'PLANO ATUAL' : isPending ? 'VALIDANDO HASH...' : isVipZero ? 'RESGATAR TESTE GRÁTIS' : 'ADQUIRIR AGORA'}
               </button>
             </div>
           );

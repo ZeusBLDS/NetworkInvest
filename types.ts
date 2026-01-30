@@ -23,6 +23,7 @@ export interface User {
   balance: number;
   walletAddress?: string;
   activePlanId?: string;
+  planActivatedAt?: number; // Adicionado para controle de expiração
   joinDate: number;
   lastCheckIn?: number;
   checkInStreak: number;

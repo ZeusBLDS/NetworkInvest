@@ -15,6 +15,7 @@ const Tasks: React.FC<TasksProps> = ({ user, onCompleteTask, onViewChange }) => 
   const [isProcessing, setIsProcessing] = useState(false);
   const [processStep, setProcessStep] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [isExpired, setIsExpired] = useState(false);
 
   const activePlan = PLANS.find(p => p.id === user.activePlanId);
   const rewardPerTask = activePlan ? activePlan.dailyReturn / activePlan.tasksPerDay : 0;
@@ -34,8 +35,23 @@ const Tasks: React.FC<TasksProps> = ({ user, onCompleteTask, onViewChange }) => 
   ];
 
   useEffect(() => {
+    checkPlanExpiration();
     fetchCompletedTasks();
-  }, []);
+  }, [user.activePlanId, user.planActivatedAt]);
+
+  const checkPlanExpiration = () => {
+    if (!activePlan || !user.planActivatedAt) return;
+    
+    const activatedDate = new Date(user.planActivatedAt);
+    const expiryDate = new Date(activatedDate);
+    expiryDate.setDate(activatedDate.getDate() + activePlan.durationDays);
+    
+    if (new Date() > expiryDate) {
+      setIsExpired(true);
+    } else {
+      setIsExpired(false);
+    }
+  };
 
   const fetchCompletedTasks = async () => {
     const today = new Date().toISOString().split('T')[0];
@@ -50,7 +66,7 @@ const Tasks: React.FC<TasksProps> = ({ user, onCompleteTask, onViewChange }) => 
   };
 
   const handleStartTask = async () => {
-    if (isWeekend) return;
+    if (isWeekend || isExpired) return;
     if (!activePlan || completedCount >= activePlan.tasksPerDay || isProcessing) return;
 
     setIsProcessing(true);
@@ -77,19 +93,27 @@ const Tasks: React.FC<TasksProps> = ({ user, onCompleteTask, onViewChange }) => 
 
   if (loading) return <div className="p-10 text-center animate-pulse font-black text-emerald-600 uppercase text-xs tracking-widest">Sincronizando Terminal...</div>;
 
-  if (!activePlan) {
+  if (!activePlan || isExpired) {
     return (
       <div className="p-6 flex flex-col items-center justify-center min-h-[80vh] text-center space-y-6">
-        <div className="w-24 h-24 bg-slate-100 rounded-[35px] flex items-center justify-center text-4xl shadow-inner animate-float">🔒</div>
+        <div className="w-24 h-24 bg-slate-100 rounded-[35px] flex items-center justify-center text-4xl shadow-inner animate-float">
+          {isExpired ? '⌛' : '🔒'}
+        </div>
         <div className="space-y-2">
-          <h2 className="text-xl font-black text-slate-800 uppercase tracking-tighter italic">Terminal Bloqueado</h2>
-          <p className="text-xs text-slate-400 font-bold max-w-[200px] mx-auto leading-relaxed">Você não possui um plano de mineração ativo no momento.</p>
+          <h2 className="text-xl font-black text-slate-800 uppercase tracking-tighter italic">
+            {isExpired ? 'Contrato Expirado' : 'Terminal Bloqueado'}
+          </h2>
+          <p className="text-xs text-slate-400 font-bold max-w-[200px] mx-auto leading-relaxed">
+            {isExpired 
+              ? `Seu plano ${activePlan?.name} chegou ao fim. Adquira um novo para continuar minerando.` 
+              : 'Você não possui um plano de mineração ativo no momento.'}
+          </p>
         </div>
         <button 
           onClick={() => onViewChange?.(AppView.PLANS)}
           className="bg-emerald-600 text-white font-black py-4 px-10 rounded-2xl shadow-xl shadow-emerald-100 uppercase text-[10px] tracking-widest active:scale-95 transition-all"
         >
-          ADQUIRIR PLANO AGORA
+          VER PLANOS DISPONÍVEIS
         </button>
       </div>
     );

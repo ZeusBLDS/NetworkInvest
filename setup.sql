@@ -7,9 +7,10 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   phone TEXT,
   referral_code TEXT UNIQUE,
   referred_by TEXT DEFAULT 'Direto',
-  balance DECIMAL(12,2) DEFAULT 0 CHECK (balance >= 0), -- Impede saldo negativo por bug
+  balance DECIMAL(12,2) DEFAULT 0 CHECK (balance >= 0),
   wallet_address TEXT,
   active_plan_id TEXT DEFAULT NULL,
+  plan_activated_at TIMESTAMPTZ DEFAULT NULL, -- COLUNA ADICIONADA PARA CONTROLE DE TEMPO
   role TEXT DEFAULT 'USER', 
   status TEXT DEFAULT 'ACTIVE',
   total_invested DECIMAL(12,2) DEFAULT 0,
@@ -22,6 +23,9 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Se a tabela já existe, execute apenas este comando no SQL Editor do Supabase:
+-- ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS plan_activated_at TIMESTAMPTZ DEFAULT NULL;
+
 -- Índices para performance em buscas de rede
 CREATE INDEX IF NOT EXISTS idx_profiles_referral_code ON public.profiles(referral_code);
 CREATE INDEX IF NOT EXISTS idx_profiles_referred_by ON public.profiles(referred_by);
@@ -32,7 +36,7 @@ CREATE TABLE IF NOT EXISTS public.user_tasks (
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   reward DECIMAL(12,2) DEFAULT 0,
   plan_id TEXT,
-  created_at TIMESTAMPTT DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- 3. TABELA DE DEPÓSITOS
@@ -81,19 +85,13 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- POLÍTICAS PARA PROFILES
--- Usuário vê apenas seu perfil
 CREATE POLICY "Users can view own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
--- Admin vê todos os perfis
 CREATE POLICY "Admins can view all profiles" ON public.profiles FOR SELECT USING (public.is_admin());
--- Admin pode atualizar perfis (saldo, status, etc)
 CREATE POLICY "Admins can update all profiles" ON public.profiles FOR UPDATE USING (public.is_admin());
--- Usuário só pode atualizar o próprio wallet_address e is_first_login (não o saldo!)
 CREATE POLICY "Users can update limited fields" ON public.profiles FOR UPDATE 
 USING (auth.uid() = id)
 WITH CHECK (
   auth.uid() = id AND (
-    -- Aqui listamos os campos que o usuário COMUM pode alterar no próprio perfil
-    -- Impede que ele mude o próprio saldo ou role via console
     (OLD.balance = NEW.balance) AND 
     (OLD.role = NEW.role) AND
     (OLD.referral_code = NEW.referral_code)

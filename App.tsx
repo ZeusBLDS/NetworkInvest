@@ -17,6 +17,7 @@ import WithdrawModal from './components/WithdrawModal';
 import DepositModal from './components/DepositModal';
 import LuckyWheelModal from './components/LuckyWheelModal';
 import OfficialNoticeModal from './components/OfficialNoticeModal';
+import VipZeroModal from './components/VipZeroModal';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.LOGIN);
@@ -31,6 +32,7 @@ const App: React.FC = () => {
   const [myDeposits, setMyDeposits] = useState<DepositRequest[]>([]);
 
   const [showWelcome, setShowWelcome] = useState(false);
+  const [showVipZero, setShowVipZero] = useState(false);
   const [showOfficialNotice, setShowOfficialNotice] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [showDeposit, setShowDeposit] = useState(false);
@@ -47,6 +49,7 @@ const App: React.FC = () => {
     balance: parseFloat(u.balance || 0),
     walletAddress: u.wallet_address || '',
     activePlanId: u.active_plan_id || null,
+    planActivatedAt: u.plan_activated_at ? new Date(u.plan_activated_at).getTime() : undefined,
     joinDate: new Date(u.created_at).getTime(),
     lastCheckIn: u.last_check_in ? new Date(u.last_check_in).getTime() : undefined,
     lastWheelSpin: u.last_wheel_spin ? new Date(u.last_wheel_spin).getTime() : undefined,
@@ -92,10 +95,20 @@ const App: React.FC = () => {
           status: req.status, timestamp: new Date(req.created_at).getTime(), method: req.method || 'USDT'
         })));
         if (user.role === 'ADMIN') await fetchAdminData();
+        
         if (user.isFirstLogin) {
           setShowWelcome(true);
           await supabase.from('profiles').update({ is_first_login: false }).eq('id', userId);
         }
+        
+        if (!user.activePlanId && !user.isFirstLogin) {
+           const hasTested = sessionStorage.getItem('ni_test_offered');
+           if (!hasTested) {
+             setShowVipZero(true);
+             sessionStorage.setItem('ni_test_offered', 'true');
+           }
+        }
+
         if (currentView === AppView.LOGIN || currentView === AppView.REGISTER) setCurrentView(AppView.HOME);
       }
     } catch (e) {
@@ -218,15 +231,14 @@ const App: React.FC = () => {
     setCurrentUser(null);
     setCurrentView(AppView.LOGIN);
     sessionStorage.removeItem('ni_notice_seen');
+    sessionStorage.removeItem('ni_test_offered');
   };
 
   const handleDepositConfirm = async (hash: string, method: 'USDT' | 'PIX') => {
     if (!currentUser) return;
     const amount = pendingPlanId ? PLANS.find(p => p.id === pendingPlanId)?.investment || 0 : 0;
+    const now = new Date().toISOString();
     
-    // ATIVAÇÃO AUTOMÁTICA SMART:
-    // Para simplificar a experiência e reduzir carga do admin, vamos ativar na hora
-    // após o usuário passar pelo processo de sincronização visual do modal.
     try {
       await supabase.from('deposits').insert({
         user_id: currentUser.id,
@@ -234,13 +246,18 @@ const App: React.FC = () => {
         amount: amount,
         hash: hash,
         plan_id: pendingPlanId,
-        status: 'APPROVED', // Ativado automaticamente
+        status: 'APPROVED', 
         method: method
       });
 
       if (pendingPlanId) {
-        await supabase.from('profiles').update({ active_plan_id: pendingPlanId }).eq('id', currentUser.id);
-        await distributeCommissions(currentUser.id, amount);
+        await supabase.from('profiles').update({ 
+          active_plan_id: pendingPlanId,
+          plan_activated_at: now 
+        }).eq('id', currentUser.id);
+        if (amount > 0) {
+          await distributeCommissions(currentUser.id, amount);
+        }
         alert('🎯 ATIVAÇÃO CONCLUÍDA! Seu plano já está operando.');
       } else {
         await updateBalance(amount);
@@ -254,6 +271,21 @@ const App: React.FC = () => {
       console.error("Erro na ativação automática:", err);
       alert("Houve um erro na ativação automática. Nossa equipe revisará manualmente.");
       setShowDeposit(false);
+    }
+  };
+
+  const handleActivateTrial = async () => {
+    if (!currentUser) return;
+    const now = new Date().toISOString();
+    try {
+      await supabase.from('profiles').update({ 
+        active_plan_id: 'vip_trial',
+        plan_activated_at: now
+      }).eq('id', currentUser.id);
+      setShowVipZero(false);
+      fetchUserProfile(currentUser.id);
+    } catch (e) {
+      console.error("Erro ao ativar vip trial:", e);
     }
   };
 
@@ -300,9 +332,13 @@ const App: React.FC = () => {
           onApproveDeposit={async (id) => {
             const dep = deposits.find(d => d.id === id);
             if (!dep || dep.status !== 'PENDING') return;
+            const now = new Date().toISOString();
             await supabase.from('deposits').update({ status: 'APPROVED' }).eq('id', id);
             if (dep.planId) {
-              await supabase.from('profiles').update({ active_plan_id: dep.planId }).eq('id', dep.userId);
+              await supabase.from('profiles').update({ 
+                active_plan_id: dep.planId,
+                plan_activated_at: now
+              }).eq('id', dep.userId);
               await distributeCommissions(dep.userId, dep.amount);
             } else {
               await updateBalance(dep.amount, dep.userId);
@@ -337,7 +373,11 @@ const App: React.FC = () => {
              fetchAdminData();
           }}
           onGivePlan={async (uid, pid) => {
-            await supabase.from('profiles').update({ active_plan_id: pid }).eq('id', uid);
+            const now = new Date().toISOString();
+            await supabase.from('profiles').update({ 
+              active_plan_id: pid,
+              plan_activated_at: now
+            }).eq('id', uid);
             fetchAdminData();
           }}
           onAdjustBalance={async (uid, amt) => {
@@ -379,7 +419,13 @@ const App: React.FC = () => {
           <PlanList 
             user={currentUser} 
             myDeposits={myDeposits} 
-            onActivate={(pid) => { setPendingPlanId(pid); setShowDeposit(true); }} 
+            onActivate={(pid) => { 
+              if (pid === 'vip_trial' || pid === 'vip0') {
+                handleActivateTrial(); 
+              } else {
+                setPendingPlanId(pid); setShowDeposit(true); 
+              }
+            }} 
           />
         )}
         {currentView === AppView.NETWORK && <NetworkView user={currentUser} />}
@@ -400,7 +446,9 @@ const App: React.FC = () => {
     <div className="max-w-md mx-auto bg-white min-h-screen shadow-2xl relative overflow-x-hidden">
       {renderContent()}
       
-      {showWelcome && <WelcomeModal onClose={() => setShowWelcome(false)} />}
+      {showWelcome && <WelcomeModal onClose={() => { setShowWelcome(false); setShowVipZero(true); }} />}
+      {showVipZero && <VipZeroModal onActivate={handleActivateTrial} />}
+      
       {showOfficialNotice && (
         <OfficialNoticeModal 
           onClose={() => { 
