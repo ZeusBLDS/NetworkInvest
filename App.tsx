@@ -50,6 +50,7 @@ const App: React.FC = () => {
     walletAddress: u.wallet_address || '',
     activePlanId: u.active_plan_id || null,
     planActivatedAt: u.plan_activated_at ? new Date(u.plan_activated_at).getTime() : undefined,
+    trialUsed: u.trial_used || false,
     joinDate: new Date(u.created_at).getTime(),
     lastCheckIn: u.last_check_in ? new Date(u.last_check_in).getTime() : undefined,
     lastWheelSpin: u.last_wheel_spin ? new Date(u.last_wheel_spin).getTime() : undefined,
@@ -101,9 +102,10 @@ const App: React.FC = () => {
           await supabase.from('profiles').update({ is_first_login: false }).eq('id', userId);
         }
         
-        if (!user.activePlanId && !user.isFirstLogin) {
-           const hasTested = sessionStorage.getItem('ni_test_offered');
-           if (!hasTested) {
+        // NOVO: Oferecer plano experiência APENAS se nunca usou e não tem plano ativo
+        if (!user.activePlanId && !user.trialUsed && !user.isFirstLogin && user.role !== 'ADMIN') {
+           const hasTestedOffer = sessionStorage.getItem('ni_test_offered');
+           if (!hasTestedOffer) {
              setShowVipZero(true);
              sessionStorage.setItem('ni_test_offered', 'true');
            }
@@ -278,9 +280,11 @@ const App: React.FC = () => {
     if (!currentUser) return;
     const now = new Date().toISOString();
     try {
+      // Ativa o trial e marca como usado para nunca mais oferecer
       await supabase.from('profiles').update({ 
         active_plan_id: 'vip_trial',
-        plan_activated_at: now
+        plan_activated_at: now,
+        trial_used: true
       }).eq('id', currentUser.id);
       setShowVipZero(false);
       fetchUserProfile(currentUser.id);
@@ -420,8 +424,11 @@ const App: React.FC = () => {
             user={currentUser} 
             myDeposits={myDeposits} 
             onActivate={(pid) => { 
-              if (pid === 'vip_trial' || pid === 'vip0') {
+              if (pid === 'vip_trial') {
                 handleActivateTrial(); 
+              } else if (pid === 'vip0') {
+                // VIP 0 continua free e ilimitado para resgate caso não tenha plano
+                handleActivateTrial(); // Reutiliza a lógica para setar no banco
               } else {
                 setPendingPlanId(pid); setShowDeposit(true); 
               }
@@ -446,7 +453,7 @@ const App: React.FC = () => {
     <div className="max-w-md mx-auto bg-white min-h-screen shadow-2xl relative overflow-x-hidden">
       {renderContent()}
       
-      {showWelcome && <WelcomeModal onClose={() => { setShowWelcome(false); setShowVipZero(true); }} />}
+      {showWelcome && <WelcomeModal onClose={() => { setShowWelcome(false); if(!currentUser?.trialUsed) setShowVipZero(true); }} />}
       {showVipZero && <VipZeroModal onActivate={handleActivateTrial} />}
       
       {showOfficialNotice && (

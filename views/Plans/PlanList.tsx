@@ -10,6 +10,14 @@ interface PlanListProps {
 }
 
 const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate }) => {
+  // Filtra o VIP de experiência se o usuário já o utilizou ou já tem planos superiores
+  const availablePlans = PLANS.filter(plan => {
+    if (plan.id === 'vip_trial') {
+      return !user.trialUsed && !user.activePlanId;
+    }
+    return true;
+  });
+
   return (
     <div className="p-6 space-y-6 bg-slate-50 min-h-screen">
       <div className="mb-6">
@@ -18,16 +26,16 @@ const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate }) => 
       </div>
 
       <div className="space-y-6">
-        {PLANS.map((plan) => {
+        {availablePlans.map((plan) => {
           const isCurrent = user.activePlanId === plan.id;
           const isPending = myDeposits.some(d => d.planId === plan.id && d.status === 'PENDING');
-          const isVipZero = plan.id === 'vip0';
+          const isFree = plan.id === 'vip0' || plan.id === 'vip_trial';
 
           return (
             <div key={plan.id} className={`relative bg-white rounded-[40px] p-7 border-2 transition-all duration-500 overflow-hidden ${isCurrent ? 'border-emerald-500 shadow-2xl shadow-emerald-100' : 'border-white shadow-xl shadow-slate-200/50'}`}>
               
               {/* Decorative elements */}
-              <div className={`absolute -top-10 -right-10 w-32 h-32 rounded-full blur-3xl opacity-10 ${isVipZero ? 'bg-amber-500' : 'bg-emerald-500'}`}></div>
+              <div className={`absolute -top-10 -right-10 w-32 h-32 rounded-full blur-3xl opacity-10 ${isFree ? 'bg-amber-500' : 'bg-emerald-500'}`}></div>
 
               {isCurrent && (
                 <div className="absolute top-4 right-6 bg-emerald-500 text-white text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg shadow-emerald-200 z-10">
@@ -35,7 +43,7 @@ const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate }) => 
                 </div>
               )}
 
-              {isVipZero && !isCurrent && (
+              {isFree && !isCurrent && (
                 <div className="absolute top-4 right-6 bg-amber-100 text-amber-700 text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest z-10">
                   ESTÁGIO GRÁTIS
                 </div>
@@ -43,7 +51,7 @@ const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate }) => 
 
               <div className="flex justify-between items-start mb-8">
                 <div>
-                  <h3 className={`text-2xl font-black tracking-tighter uppercase italic ${isVipZero ? 'text-amber-600' : 'text-slate-900'}`}>{plan.name}</h3>
+                  <h3 className={`text-2xl font-black tracking-tighter uppercase italic ${isFree ? 'text-amber-600' : 'text-slate-900'}`}>{plan.name}</h3>
                   <div className="flex items-center space-x-2 mt-1">
                     <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md font-black uppercase">{plan.durationDays} Dias</span>
                     <span className="text-[10px] text-slate-300 font-bold uppercase tracking-widest">Contrato</span>
@@ -52,7 +60,7 @@ const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate }) => 
                 <div className="text-right">
                   <div className="flex items-baseline justify-end space-x-1">
                     <span className="text-3xl font-black text-slate-900">{plan.investment.toFixed(2)}</span>
-                    <span className={`text-xs font-black uppercase ${isVipZero ? 'text-amber-500' : 'text-emerald-500'}`}>USDT</span>
+                    <span className={`text-xs font-black uppercase ${isFree ? 'text-amber-500' : 'text-emerald-500'}`}>USDT</span>
                   </div>
                   <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Adesão</p>
                 </div>
@@ -69,7 +77,7 @@ const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate }) => 
                 </div>
               </div>
 
-              {!isVipZero && (
+              {!isFree && (
                 <div className="mb-8 space-y-2.5">
                   <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
                     <span className="text-emerald-600">Rentabilidade</span>
@@ -87,12 +95,12 @@ const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate }) => 
                 className={`w-full py-5 rounded-[22px] font-black text-[11px] uppercase tracking-[0.2em] transition-all duration-300 ${
                   isCurrent ? 'bg-slate-50 text-slate-300 cursor-not-allowed border border-slate-200' :
                   isPending ? 'bg-amber-50 text-amber-600 border border-amber-200 animate-pulse' :
-                  isVipZero 
+                  isFree 
                     ? 'bg-amber-500 text-white shadow-xl shadow-amber-100 active:scale-95' 
                     : 'bg-emerald-600 text-white shadow-xl shadow-emerald-100 active:scale-95 hover:bg-emerald-700'
                 }`}
               >
-                {isCurrent ? 'PLANO ATUAL' : isPending ? 'VALIDANDO HASH...' : isVipZero ? 'RESGATAR TESTE GRÁTIS' : 'ADQUIRIR AGORA'}
+                {isCurrent ? 'PLANO ATUAL' : isPending ? 'VALIDANDO HASH...' : isFree ? 'RESGATAR TESTE GRÁTIS' : 'ADQUIRIR AGORA'}
               </button>
             </div>
           );

@@ -23,7 +23,8 @@ export interface User {
   balance: number;
   walletAddress?: string;
   activePlanId?: string;
-  planActivatedAt?: number; // Adicionado para controle de expiração
+  planActivatedAt?: number;
+  trialUsed: boolean; // Adicionado para controle de bônus único
   joinDate: number;
   lastCheckIn?: number;
   checkInStreak: number;
