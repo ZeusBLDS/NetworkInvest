@@ -27,10 +27,10 @@ export const PLANS: Plan[] = [
     id: 'vip0',
     name: 'VIP 0',
     investment: 0.00,
-    dailyReturn: 0.05,
+    dailyReturn: 0.30, // Corrigido de 0.05 para 0.30
     dailyPercent: 0,
     durationDays: 365,
-    totalReturn: 18.25,
+    totalReturn: 109.50, // Ajustado (365 * 0.30)
     tasksPerDay: 1
   },
   {
