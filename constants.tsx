@@ -1,17 +1,6 @@
 
 import { Plan } from './types';
 
-// Lógica para definir o valor mínimo de saque dinamicamente
-const getCurrentMinWithdrawal = () => {
-  const now = new Date();
-  const todayMidnight = new Date();
-  todayMidnight.setHours(23, 59, 59, 999);
-  
-  // Se ainda estivermos no dia de "hoje" (antes da meia-noite), o limite é 6.
-  // Após isso, o valor de 9 torna-se fixo.
-  return now <= todayMidnight ? 6 : 9;
-};
-
 export const PLANS: Plan[] = [
   {
     id: 'vip_trial',
@@ -27,10 +16,10 @@ export const PLANS: Plan[] = [
     id: 'vip0',
     name: 'VIP 0',
     investment: 0.00,
-    dailyReturn: 0.30, // Corrigido de 0.05 para 0.30
+    dailyReturn: 0.30, 
     dailyPercent: 0,
     durationDays: 365,
-    totalReturn: 109.50, // Ajustado (365 * 0.30)
+    totalReturn: 109.50,
     tasksPerDay: 1
   },
   {
@@ -78,7 +67,7 @@ export const PLANS: Plan[] = [
 export const REFERRAL_RATES = [0.05, 0.03, 0.01, 0.01, 0.01];
 
 export const APP_CONFIG = {
-  MIN_WITHDRAWAL: getCurrentMinWithdrawal(), 
+  MIN_WITHDRAWAL: 9, // Valor agora fixo conforme solicitado
   NETWORK: 'USDT (BSC / BEP20)',
   DEFAULT_REFERRER: 'Não informado',
   DEPOSIT_WALLET: '0xc68b8357ca00a27781630d341096bc54e4c4b30f',

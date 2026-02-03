@@ -18,9 +18,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ user, onClose, onSubmit }
   const [canWithdraw, setCanWithdraw] = useState(false);
   const [timeMessage, setTimeMessage] = useState('');
 
-  // O limite é lido diretamente do APP_CONFIG que agora é dinâmico
   const minLimit = APP_CONFIG.MIN_WITHDRAWAL;
-  const isPromo = minLimit === 6;
 
   useEffect(() => {
     const checkTime = () => {
@@ -44,7 +42,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ user, onClose, onSubmit }
     };
 
     checkTime();
-    const interval = setInterval(checkTime, 30000); // Checa a cada 30s
+    const interval = setInterval(checkTime, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -74,23 +72,12 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ user, onClose, onSubmit }
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 backdrop-blur-sm p-6">
       <div className="bg-white rounded-[40px] w-full max-w-sm p-8 shadow-2xl animate-in zoom-in duration-300 overflow-hidden relative">
-        <div className={`absolute top-0 left-0 w-full h-1.5 ${canWithdraw ? (isPromo ? 'bg-blue-500' : 'bg-emerald-500') : 'bg-amber-500'}`}></div>
+        <div className={`absolute top-0 left-0 w-full h-1.5 ${canWithdraw ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
         
         <h2 className="text-xl font-black text-center text-gray-900 mb-6 uppercase tracking-tighter italic">
           SOLICITAR SAQUE
         </h2>
 
-        {/* Promo Badge */}
-        {isPromo && (
-          <div className="mb-4 bg-blue-50 border border-blue-100 py-2 px-4 rounded-xl flex items-center justify-center space-x-2 animate-pulse">
-            <span className="text-sm">🔥</span>
-            <p className="text-[9px] font-black text-blue-700 uppercase tracking-widest">
-              Promoção: Saque mínimo reduzido para 6.00 USDT hoje!
-            </p>
-          </div>
-        )}
-
-        {/* Banner de Status de Horário */}
         {!canWithdraw && (
           <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl mb-6 text-center animate-pulse">
             <p className="text-[9px] font-black text-amber-700 uppercase tracking-widest leading-tight">
@@ -100,7 +87,6 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ user, onClose, onSubmit }
           </div>
         )}
 
-        {/* Seletor de Método */}
         <div className="flex bg-slate-100 p-1 rounded-2xl mb-6">
           <button 
             onClick={() => { setMethod('USDT'); setWallet(user.walletAddress || ''); }}
@@ -135,7 +121,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ user, onClose, onSubmit }
               onChange={(e) => setAmount(e.target.value)}
             />
             <div className="flex justify-between items-center mt-2 px-1">
-              <p className={`text-[9px] font-black uppercase tracking-widest ${isPromo ? 'text-blue-600' : 'text-emerald-600/60'}`}>
+              <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600/60">
                 * Mínimo: {minLimit} USDT
               </p>
               {parseFloat(amount) > 0 && (
