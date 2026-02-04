@@ -1,16 +1,17 @@
 
 import React, { useState } from 'react';
 import { User } from '../types';
+import { APP_CONFIG } from '../constants';
 
 interface DailyCheckInProps {
   user: User;
   onCheckIn: () => Promise<number | undefined>;
+  currency: 'BRL' | 'USDT';
 }
 
-const DailyCheckIn: React.FC<DailyCheckInProps> = ({ user, onCheckIn }) => {
+const DailyCheckIn: React.FC<DailyCheckInProps> = ({ user, onCheckIn, currency }) => {
   const [loading, setLoading] = useState(false);
   
-  // Comparação de data local robusta
   const today = new Date().toLocaleDateString('pt-BR');
   const lastCheckInDate = user.lastCheckIn ? new Date(user.lastCheckIn).toLocaleDateString('pt-BR') : '';
   const alreadyCheckedIn = lastCheckInDate === today;
@@ -20,6 +21,13 @@ const DailyCheckIn: React.FC<DailyCheckInProps> = ({ user, onCheckIn }) => {
   const earningToday = 0.01;
 
   const totalProfit = (user.balance || 0) + (user.totalWithdrawn || 0);
+
+  const formatValue = (val: number) => {
+    if (currency === 'BRL') {
+      return (val * APP_CONFIG.USDT_BRL_RATE).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+    }
+    return val.toFixed(2);
+  };
 
   const handleCheckIn = async () => {
     if (alreadyCheckedIn || loading) return;
@@ -49,15 +57,15 @@ const DailyCheckIn: React.FC<DailyCheckInProps> = ({ user, onCheckIn }) => {
             {alreadyCheckedIn ? 'GANHOU HOJE' : 'GANHO DE HOJE'}
           </p>
           <div className="flex items-baseline space-x-1">
-            <span className="text-xl font-black text-emerald-800">{earningToday.toFixed(2)}</span>
-            <span className="text-[8px] font-black text-emerald-600 uppercase">usdt</span>
+            <span className="text-xl font-black text-emerald-800">{formatValue(earningToday)}</span>
+            <span className="text-[8px] font-black text-emerald-600 uppercase">{currency}</span>
           </div>
         </div>
         <div className="pl-2">
           <p className="text-[8px] font-black text-emerald-600 uppercase tracking-widest mb-1 opacity-70">LUCRO TOTAL</p>
           <div className="flex items-baseline space-x-1">
-            <span className="text-xl font-black text-emerald-800">{totalProfit.toFixed(2)}</span>
-            <span className="text-[8px] font-black text-emerald-600 uppercase">usdt</span>
+            <span className="text-xl font-black text-emerald-800">{formatValue(totalProfit)}</span>
+            <span className="text-[8px] font-black text-emerald-600 uppercase">{currency}</span>
           </div>
         </div>
       </div>

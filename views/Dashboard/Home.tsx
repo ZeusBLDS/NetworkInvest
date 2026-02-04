@@ -2,7 +2,7 @@
 import React from 'react';
 import { User, Notification, DepositRequest } from '../../types';
 import DailyCheckIn from '../../components/DailyCheckIn';
-import { PLANS } from '../../constants';
+import { PLANS, APP_CONFIG } from '../../constants';
 
 interface HomeProps {
   user: User;
@@ -10,12 +10,17 @@ interface HomeProps {
   updateBalance: (amount: number) => void;
   performCheckIn: () => Promise<number | undefined>;
   addNotification: (type: Notification['type'], message: string) => void;
+  currency: 'BRL' | 'USDT';
+  onToggleCurrency: () => void;
   onOpenWithdraw: () => void;
   onOpenDeposit: () => void;
   onOpenWheel: () => void;
 }
 
-const Home: React.FC<HomeProps> = ({ user, myDeposits, performCheckIn, onOpenWithdraw, onOpenDeposit, onOpenWheel }) => {
+const Home: React.FC<HomeProps> = ({ 
+  user, myDeposits, performCheckIn, onOpenWithdraw, onOpenDeposit, onOpenWheel,
+  currency, onToggleCurrency 
+}) => {
   const activePlanName = PLANS.find(p => p.id === user.activePlanId)?.name || 'Nenhum Plano Ativo';
   const whatsappLink = "https://chat.whatsapp.com/DrML9fOcyOQ5IIi2MDnueA?mode=gi_t"; 
   
@@ -24,9 +29,17 @@ const Home: React.FC<HomeProps> = ({ user, myDeposits, performCheckIn, onOpenWit
     { label: 'Tabela VIP 90 Dias', url: 'https://www.dropbox.com/scl/fi/62z7x3pmvxo261dtw6u30/Network_Invest_PDF_Completo.pdf?rlkey=ud1fybfe5o4w2r3agnmkzg93k&st=ofi9inbd&dl=0', icon: '📊' }
   ];
 
+  const formatValue = (val: number) => {
+    if (currency === 'BRL') {
+      const brlValue = val * APP_CONFIG.USDT_BRL_RATE;
+      return brlValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+    return val.toLocaleString('en-US', { minimumFractionDigits: 2 });
+  };
+
   return (
     <div className="p-5 space-y-6 animate-in fade-in duration-700 bg-slate-50 min-h-screen">
-      {/* Header com ID Único */}
+      {/* Header com ID Único e Toggle de Moeda */}
       <div className="flex items-center justify-between px-2 pt-2">
         <div className="flex flex-col">
           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Identificador de Ativação</p>
@@ -35,10 +48,18 @@ const Home: React.FC<HomeProps> = ({ user, myDeposits, performCheckIn, onOpenWit
             <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Status da Rede</p>
-          <p className="text-[10px] font-black text-emerald-600 uppercase italic">Online & Seguro</p>
-        </div>
+        
+        {/* Switch de Moeda Moderno */}
+        <button 
+          onClick={onToggleCurrency}
+          className="bg-white px-4 py-2 rounded-2xl shadow-sm border border-slate-100 flex items-center space-x-2 active:scale-95 transition-all"
+        >
+          <span className={`text-[10px] font-black ${currency === 'BRL' ? 'text-emerald-600' : 'text-slate-300'}`}>BRL</span>
+          <div className="w-8 h-4 bg-slate-100 rounded-full relative p-0.5">
+            <div className={`w-3 h-3 bg-emerald-500 rounded-full transition-all duration-300 ${currency === 'USDT' ? 'translate-x-4' : 'translate-x-0'}`}></div>
+          </div>
+          <span className={`text-[10px] font-black ${currency === 'USDT' ? 'text-emerald-600' : 'text-slate-300'}`}>USDT</span>
+        </button>
       </div>
 
       {/* Saldo Principal */}
@@ -46,13 +67,13 @@ const Home: React.FC<HomeProps> = ({ user, myDeposits, performCheckIn, onOpenWit
         <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-500/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
         <div className="relative z-10">
           <div className="flex justify-between items-center opacity-50 mb-1">
-            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Balanço USDT</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Balanço {currency}</span>
           </div>
           <div className="flex items-baseline space-x-2 mb-8">
             <h2 className="text-4xl font-black tracking-tighter">
-              {user.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              {formatValue(user.balance).replace('R$', '').trim()}
             </h2>
-            <span className="text-emerald-400 font-bold text-xs uppercase">usdt</span>
+            <span className="text-emerald-400 font-bold text-xs uppercase">{currency.toLowerCase()}</span>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <button onClick={onOpenDeposit} className="bg-emerald-500 text-slate-900 font-black py-4 rounded-2xl text-[10px] uppercase active:scale-95 transition-all shadow-lg">Ativar Plano</button>
@@ -61,7 +82,7 @@ const Home: React.FC<HomeProps> = ({ user, myDeposits, performCheckIn, onOpenWit
         </div>
       </div>
 
-      {/* CARD DO WHATSAPP - MÁXIMA VISIBILIDADE */}
+      {/* CARD DO WHATSAPP */}
       <div 
         onClick={() => window.open(whatsappLink, '_blank')}
         className="bg-white border-2 border-[#25D366]/30 rounded-[35px] p-5 shadow-lg shadow-green-100 flex items-center justify-between group active:scale-[0.98] transition-all cursor-pointer overflow-hidden relative"
@@ -103,7 +124,7 @@ const Home: React.FC<HomeProps> = ({ user, myDeposits, performCheckIn, onOpenWit
         </div>
       </div>
 
-      <DailyCheckIn user={user} onCheckIn={performCheckIn} />
+      <DailyCheckIn user={user} onCheckIn={performCheckIn} currency={currency} />
 
       {/* Plano Ativo */}
       <div className="space-y-3">
@@ -125,38 +146,6 @@ const Home: React.FC<HomeProps> = ({ user, myDeposits, performCheckIn, onOpenWit
         </div>
       </div>
 
-      {/* Lucky Spin Button */}
-      <button onClick={onOpenWheel} className="w-full bg-white rounded-[28px] p-5 border border-slate-100 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all">
-        <div className="flex items-center space-x-4">
-          <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-xl">🎡</div>
-          <div className="text-left">
-            <p className="text-xs font-black text-slate-800 uppercase tracking-tight">Roleta da Sorte</p>
-            <p className="text-[9px] text-emerald-500 font-bold uppercase tracking-widest">Giro Diário Disponível</p>
-          </div>
-        </div>
-        <svg className="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" /></svg>
-      </button>
-
-      {/* DOCUMENTAÇÃO & GUIAS */}
-      <div className="space-y-3">
-        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Materiais Oficiais</h3>
-        <div className="bg-white rounded-[32px] border border-slate-100 divide-y divide-slate-50 overflow-hidden shadow-sm">
-          {docs.map((doc, idx) => (
-            <button 
-              key={idx}
-              onClick={() => window.open(doc.url, '_blank')}
-              className="w-full p-5 flex items-center justify-between active:bg-slate-50 transition-all group"
-            >
-              <div className="flex items-center space-x-4">
-                <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-lg">{doc.icon}</div>
-                <span className="text-xs font-bold text-slate-700 uppercase tracking-tight">{doc.label}</span>
-              </div>
-              <svg className="w-5 h-5 text-slate-200 group-hover:text-emerald-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" /></svg>
-            </button>
-          ))}
-        </div>
-      </div>
-      
       <div className="h-20" />
     </div>
   );

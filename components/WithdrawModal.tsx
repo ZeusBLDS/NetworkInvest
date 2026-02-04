@@ -5,20 +5,27 @@ import { APP_CONFIG } from '../constants';
 
 interface WithdrawModalProps {
   user: User;
+  currency: 'BRL' | 'USDT';
   onClose: () => void;
   onSubmit: (amount: number, wallet: string, method: 'USDT' | 'PIX') => void;
 }
 
-const WithdrawModal: React.FC<WithdrawModalProps> = ({ user, onClose, onSubmit }) => {
+const WithdrawModal: React.FC<WithdrawModalProps> = ({ user, onClose, onSubmit, currency }) => {
   const [method, setMethod] = useState<'USDT' | 'PIX'>('USDT');
   const [amount, setAmount] = useState('');
   const [wallet, setWallet] = useState(method === 'USDT' ? (user.walletAddress || '') : '');
 
-  // Verificação de Horário e Dia de Saque
   const [canWithdraw, setCanWithdraw] = useState(false);
   const [timeMessage, setTimeMessage] = useState('');
 
   const minLimit = APP_CONFIG.MIN_WITHDRAWAL;
+
+  const formatValue = (val: number) => {
+    if (currency === 'BRL') {
+      return (val * APP_CONFIG.USDT_BRL_RATE).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+    return `${val.toFixed(2)} USDT`;
+  };
 
   useEffect(() => {
     const checkTime = () => {
@@ -53,7 +60,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ user, onClose, onSubmit }
     }
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount < minLimit) {
-      alert(`O saque mínimo atual é de ${minLimit} USDT`);
+      alert(`O saque mínimo atual é de ${minLimit} USDT (${formatValue(minLimit)})`);
       return;
     }
     if (numAmount > user.balance) {
@@ -81,8 +88,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ user, onClose, onSubmit }
         {!canWithdraw && (
           <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl mb-6 text-center animate-pulse">
             <p className="text-[9px] font-black text-amber-700 uppercase tracking-widest leading-tight">
-              {timeMessage}<br/>
-              <span className="opacity-60">Solicitações fora do horário não serão processadas</span>
+              {timeMessage}
             </p>
           </div>
         )}
@@ -106,8 +112,8 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ user, onClose, onSubmit }
           <div className="bg-emerald-50/50 p-4 rounded-3xl border border-emerald-100">
             <label className="block text-[9px] font-black text-emerald-600 uppercase mb-2 tracking-widest">Saldo Disponível</label>
             <div className="flex items-baseline space-x-2">
-              <span className="text-2xl font-black text-emerald-900">{user.balance.toFixed(2)}</span>
-              <span className="text-xs font-bold text-emerald-600 uppercase tracking-widest">USDT</span>
+              <span className="text-2xl font-black text-emerald-900">{formatValue(user.balance).replace('R$', '')}</span>
+              <span className="text-xs font-bold text-emerald-600 uppercase tracking-widest">{currency}</span>
             </div>
           </div>
 
@@ -122,19 +128,14 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ user, onClose, onSubmit }
             />
             <div className="flex justify-between items-center mt-2 px-1">
               <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600/60">
-                * Mínimo: {minLimit} USDT
+                * Mínimo: {minLimit} USDT ({formatValue(minLimit)})
               </p>
-              {parseFloat(amount) > 0 && (
-                <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest">
-                  Taxa: {(parseFloat(amount) * currentFee).toFixed(2)} USDT
-                </p>
-              )}
             </div>
           </div>
 
           <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 px-1 tracking-widest">
-              {method === 'USDT' ? 'Carteira USDT (BEP20)' : 'Chave PIX (CPF/Email/Cel)'}
+              {method === 'USDT' ? 'Carteira USDT (BEP20)' : 'Chave PIX'}
             </label>
             <input 
               type="text"
@@ -155,16 +156,9 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ user, onClose, onSubmit }
                 : 'bg-slate-100 text-slate-300 cursor-not-allowed'
               }`}
             >
-              {canWithdraw || user.role === 'ADMIN' ? `CONFIRMAR SAQUE ${method}` : 'SAQUE INDISPONÍVEL'}
+              CONFIRMAR SAQUE
             </button>
           </div>
-
-          <button 
-            onClick={onClose}
-            className="w-full text-slate-300 font-black text-[9px] uppercase tracking-[0.3em] py-2 hover:text-slate-500 transition-colors"
-          >
-            VOLTAR AO DASHBOARD
-          </button>
         </div>
       </div>
     </div>

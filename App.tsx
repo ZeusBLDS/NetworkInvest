@@ -25,6 +25,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [authSession, setAuthSession] = useState<any>(null);
   const [customWallet, setCustomWallet] = useState(APP_CONFIG.DEPOSIT_WALLET);
+  const [currency, setCurrency] = useState<'BRL' | 'USDT'>('BRL');
   
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [deposits, setDeposits] = useState<DepositRequest[]>([]);
@@ -102,7 +103,6 @@ const App: React.FC = () => {
           await supabase.from('profiles').update({ is_first_login: false }).eq('id', userId);
         }
         
-        // NOVO: Oferecer plano experiência APENAS se nunca usou e não tem plano ativo
         if (!user.activePlanId && !user.trialUsed && !user.isFirstLogin && user.role !== 'ADMIN') {
            const hasTestedOffer = sessionStorage.getItem('ni_test_offered');
            if (!hasTestedOffer) {
@@ -280,7 +280,6 @@ const App: React.FC = () => {
     if (!currentUser) return;
     const now = new Date().toISOString();
     try {
-      // Ativa o trial e marca como usado para nunca mais oferecer
       await supabase.from('profiles').update({ 
         active_plan_id: 'vip_trial',
         plan_activated_at: now,
@@ -406,6 +405,8 @@ const App: React.FC = () => {
             myDeposits={myDeposits} 
             updateBalance={updateBalance} 
             performCheckIn={performCheckIn}
+            currency={currency}
+            onToggleCurrency={() => setCurrency(prev => prev === 'BRL' ? 'USDT' : 'BRL')}
             addNotification={() => {}} 
             onOpenWithdraw={() => setShowWithdraw(true)} 
             onOpenDeposit={() => { setPendingPlanId(null); setShowDeposit(true); }} 
@@ -416,6 +417,7 @@ const App: React.FC = () => {
           <Tasks 
             user={currentUser} 
             onCompleteTask={updateBalance} 
+            currency={currency}
             onViewChange={setCurrentView} 
           />
         )}
@@ -423,25 +425,27 @@ const App: React.FC = () => {
           <PlanList 
             user={currentUser} 
             myDeposits={myDeposits} 
+            currency={currency}
             onActivate={(pid) => { 
               if (pid === 'vip_trial') {
                 handleActivateTrial(); 
               } else if (pid === 'vip0') {
-                // VIP 0 continua free e ilimitado para resgate caso não tenha plano
-                handleActivateTrial(); // Reutiliza a lógica para setar no banco
+                handleActivateTrial(); 
               } else {
                 setPendingPlanId(pid); setShowDeposit(true); 
               }
             }} 
           />
         )}
-        {currentView === AppView.NETWORK && <NetworkView user={currentUser} />}
+        {currentView === AppView.NETWORK && <NetworkView user={currentUser} currency={currency} />}
         {currentView === AppView.ACCOUNT && (
           <Account 
             user={currentUser} 
             onLogout={handleLogout} 
             onUpdateUser={setCurrentUser} 
             onViewChange={setCurrentView} 
+            currency={currency}
+            onToggleCurrency={() => setCurrency(prev => prev === 'BRL' ? 'USDT' : 'BRL')}
             notifications={[]} 
           />
         )}
@@ -464,7 +468,7 @@ const App: React.FC = () => {
           }} 
         />
       )}
-      {showWithdraw && <WithdrawModal user={currentUser!} onClose={() => setShowWithdraw(false)} onSubmit={handleWithdrawSubmit} />}
+      {showWithdraw && <WithdrawModal user={currentUser!} currency={currency} onClose={() => setShowWithdraw(false)} onSubmit={handleWithdrawSubmit} />}
       {showDeposit && (
         <DepositModal 
           wallet={customWallet} 

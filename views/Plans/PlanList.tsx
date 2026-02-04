@@ -1,22 +1,30 @@
 
 import React from 'react';
 import { User, DepositRequest } from '../../types';
-import { PLANS } from '../../constants';
+import { PLANS, APP_CONFIG } from '../../constants';
 
 interface PlanListProps {
   user: User;
   myDeposits: DepositRequest[];
+  currency: 'BRL' | 'USDT';
   onActivate: (planId: string) => void;
 }
 
-const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate }) => {
-  // Filtra o VIP de experiência se o usuário já o utilizou ou já tem planos superiores
+const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate, currency }) => {
   const availablePlans = PLANS.filter(plan => {
     if (plan.id === 'vip_trial') {
       return !user.trialUsed && !user.activePlanId;
     }
     return true;
   });
+
+  const formatValue = (val: number) => {
+    if (currency === 'BRL') {
+      const brlValue = val * APP_CONFIG.USDT_BRL_RATE;
+      return brlValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+    return `${val.toFixed(2)} USDT`;
+  };
 
   return (
     <div className="p-6 space-y-6 bg-slate-50 min-h-screen">
@@ -34,7 +42,6 @@ const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate }) => 
           return (
             <div key={plan.id} className={`relative bg-white rounded-[40px] p-7 border-2 transition-all duration-500 overflow-hidden ${isCurrent ? 'border-emerald-500 shadow-2xl shadow-emerald-100' : 'border-white shadow-xl shadow-slate-200/50'}`}>
               
-              {/* Decorative elements */}
               <div className={`absolute -top-10 -right-10 w-32 h-32 rounded-full blur-3xl opacity-10 ${isFree ? 'bg-amber-500' : 'bg-emerald-500'}`}></div>
 
               {isCurrent && (
@@ -43,24 +50,19 @@ const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate }) => 
                 </div>
               )}
 
-              {isFree && !isCurrent && (
-                <div className="absolute top-4 right-6 bg-amber-100 text-amber-700 text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest z-10">
-                  ESTÁGIO GRÁTIS
-                </div>
-              )}
-
               <div className="flex justify-between items-start mb-8">
                 <div>
                   <h3 className={`text-2xl font-black tracking-tighter uppercase italic ${isFree ? 'text-amber-600' : 'text-slate-900'}`}>{plan.name}</h3>
                   <div className="flex items-center space-x-2 mt-1">
                     <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md font-black uppercase">{plan.durationDays} Dias</span>
-                    <span className="text-[10px] text-slate-300 font-bold uppercase tracking-widest">Contrato</span>
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="flex items-baseline justify-end space-x-1">
-                    <span className="text-3xl font-black text-slate-900">{plan.investment.toFixed(2)}</span>
-                    <span className={`text-xs font-black uppercase ${isFree ? 'text-amber-500' : 'text-emerald-500'}`}>USDT</span>
+                    <span className="text-2xl font-black text-slate-900">
+                      {currency === 'BRL' ? (plan.investment * APP_CONFIG.USDT_BRL_RATE).toFixed(2) : plan.investment.toFixed(2)}
+                    </span>
+                    <span className={`text-[10px] font-black uppercase ${isFree ? 'text-amber-500' : 'text-emerald-500'}`}>{currency}</span>
                   </div>
                   <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Adesão</p>
                 </div>
@@ -69,25 +71,13 @@ const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate }) => 
               <div className="grid grid-cols-2 gap-4 mb-8">
                 <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100/50">
                   <p className="text-[8px] font-black text-slate-400 uppercase mb-1 tracking-widest">Ganho Diário</p>
-                  <p className="text-base font-black text-slate-800 tracking-tight">{plan.dailyReturn.toFixed(2)} USDT</p>
+                  <p className="text-sm font-black text-slate-800 tracking-tight">{formatValue(plan.dailyReturn)}</p>
                 </div>
                 <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100/50 text-right">
                   <p className="text-[8px] font-black text-slate-400 uppercase mb-1 tracking-widest">Retorno Final</p>
-                  <p className="text-base font-black text-slate-800 tracking-tight">{plan.totalReturn.toFixed(2)} USDT</p>
+                  <p className="text-sm font-black text-slate-800 tracking-tight">{formatValue(plan.totalReturn)}</p>
                 </div>
               </div>
-
-              {!isFree && (
-                <div className="mb-8 space-y-2.5">
-                  <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
-                    <span className="text-emerald-600">Rentabilidade</span>
-                    <span className="text-emerald-600">{plan.dailyPercent}% / Dia</span>
-                  </div>
-                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden p-0.5 shadow-inner">
-                    <div className={`h-full rounded-full transition-all duration-1000 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]`} style={{ width: `${Math.min(plan.dailyPercent * 5, 100)}%` }}></div>
-                  </div>
-                </div>
-              )}
 
               <button
                 disabled={isCurrent || isPending}
@@ -100,7 +90,7 @@ const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate }) => 
                     : 'bg-emerald-600 text-white shadow-xl shadow-emerald-100 active:scale-95 hover:bg-emerald-700'
                 }`}
               >
-                {isCurrent ? 'PLANO ATUAL' : isPending ? 'VALIDANDO HASH...' : isFree ? 'RESGATAR TESTE GRÁTIS' : 'ADQUIRIR AGORA'}
+                {isCurrent ? 'PLANO ATUAL' : isPending ? 'VALIDANDO...' : isFree ? 'RESGATAR TESTE' : 'ADQUIRIR AGORA'}
               </button>
             </div>
           );
