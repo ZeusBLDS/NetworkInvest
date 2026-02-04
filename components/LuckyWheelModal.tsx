@@ -18,7 +18,6 @@ const LuckyWheelModal: React.FC<LuckyWheelModalProps> = ({ user, onClose, onWin 
   const prizes = [0.01, 0.02, 0.03, 0.05, 0.10, 0.01, 0.02, 0.05];
   const weights = [50, 25, 10, 5, 1, 5, 3, 1];
 
-  // VIP 0 agora é pago, então qualquer plano ativo permite o giro
   const hasActivePlan = !!user.activePlanId;
 
   const handleSpin = async () => {
@@ -34,41 +33,62 @@ const LuckyWheelModal: React.FC<LuckyWheelModalProps> = ({ user, onClose, onWin 
     }
 
     const today = new Date().toISOString().split('T')[0];
-    const { data: profile } = await supabase.from('profiles').select('last_wheel_spin').eq('id', user.id).single();
     
-    if (profile?.last_wheel_spin && new Date(profile.last_wheel_spin).toISOString().split('T')[0] === today) {
-      setSpinning(false);
-      setError('Você já girou hoje!');
-      return;
-    }
+    try {
+      // Verificação de segurança via banco
+      const { data: profile, error: fetchError } = await supabase
+        .from('profiles')
+        .select('last_wheel_spin')
+        .eq('id', user.id)
+        .single();
+      
+      if (fetchError) throw new Error('Falha ao conectar ao servidor.');
 
-    await supabase.from('profiles').update({ last_wheel_spin: new Date().toISOString() }).eq('id', user.id);
-
-    const totalWeight = weights.reduce((acc, w) => acc + w, 0);
-    let random = Math.random() * totalWeight;
-    let selectedIndex = 0;
-    for (let i = 0; i < weights.length; i++) {
-      if (random < weights[i]) {
-        selectedIndex = i;
-        break;
+      if (profile?.last_wheel_spin && new Date(profile.last_wheel_spin).toISOString().split('T')[0] === today) {
+        setSpinning(false);
+        setError('Você já girou hoje! Volte amanhã.');
+        return;
       }
-      random -= weights[i];
-    }
 
-    const sliceAngle = 360 / prizes.length;
-    const spinCount = 8;
-    const sliceOffset = Math.random() * (sliceAngle * 0.8) + (sliceAngle * 0.1);
-    const targetAngle = 360 - (selectedIndex * sliceAngle) - sliceOffset;
-    const totalDegrees = rotation + (spinCount * 360) + (targetAngle - (rotation % 360));
-    
-    setRotation(totalDegrees);
+      // Sorteio
+      const totalWeight = weights.reduce((acc, w) => acc + w, 0);
+      let random = Math.random() * totalWeight;
+      let selectedIndex = 0;
+      for (let i = 0; i < weights.length; i++) {
+        if (random < weights[i]) {
+          selectedIndex = i;
+          break;
+        }
+        random -= weights[i];
+      }
 
-    setTimeout(() => {
+      const sliceAngle = 360 / prizes.length;
+      const spinCount = 10;
+      const sliceOffset = (sliceAngle / 2); // Centraliza o ponteiro
+      const targetAngle = 360 - (selectedIndex * sliceAngle) - sliceOffset;
+      const totalDegrees = rotation + (spinCount * 360) + (targetAngle - (rotation % 360));
+      
+      // Salva o giro ANTES de mostrar o resultado para evitar abusos
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ last_wheel_spin: new Date().toISOString() })
+        .eq('id', user.id);
+
+      if (updateError) throw new Error('Erro ao validar giro. Tente novamente.');
+
+      setRotation(totalDegrees);
+
+      setTimeout(() => {
+        setSpinning(false);
+        const prize = prizes[selectedIndex];
+        setResult(prize);
+        onWin(prize);
+      }, 4500);
+
+    } catch (err: any) {
       setSpinning(false);
-      const prize = prizes[selectedIndex];
-      setResult(prize);
-      onWin(prize);
-    }, 4000);
+      setError(err.message || 'Ocorreu um erro inesperado.');
+    }
   };
 
   return (
@@ -87,7 +107,7 @@ const LuckyWheelModal: React.FC<LuckyWheelModalProps> = ({ user, onClose, onWin 
           </div>
           
           <div 
-            className="w-full h-full rounded-full border-[10px] border-emerald-50 shadow-2xl relative overflow-hidden transition-transform duration-[4000ms] ease-[cubic-bezier(0.15,0,0.15,1)] z-10"
+            className="w-full h-full rounded-full border-[10px] border-emerald-50 shadow-2xl relative overflow-hidden transition-transform duration-[4500ms] ease-[cubic-bezier(0.15,0,0.15,1)] z-10"
             style={{ transform: `rotate(${rotation}deg)` }}
           >
             {prizes.map((p, i) => (
@@ -109,7 +129,7 @@ const LuckyWheelModal: React.FC<LuckyWheelModalProps> = ({ user, onClose, onWin 
         </div>
 
         {error && (
-          <div className="mb-8 p-4 bg-red-50 border border-red-100 rounded-3xl text-center">
+          <div className="mb-8 p-4 bg-red-50 border border-red-100 rounded-3xl text-center w-full">
             <p className="text-[10px] font-black text-red-600 uppercase tracking-widest leading-tight">{error}</p>
           </div>
         )}

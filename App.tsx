@@ -313,6 +313,9 @@ const App: React.FC = () => {
 
   const handleWinWheel = async (amount: number) => {
     await updateBalance(amount);
+    if (currentUser) {
+      fetchUserProfile(currentUser.id);
+    }
   };
 
   if (loading) return <div className="h-screen flex items-center justify-center font-black text-emerald-600 bg-white text-xs uppercase tracking-[0.5em]">Network Invest...</div>;

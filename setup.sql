@@ -1,5 +1,5 @@
 
--- 1. TABELA DE PERFIS (Reforçada com campos de controle de teste)
+-- 1. TABELA DE PERFIS
 CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
   name TEXT,
@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   wallet_address TEXT,
   active_plan_id TEXT DEFAULT NULL,
   plan_activated_at TIMESTAMPTZ DEFAULT NULL,
-  trial_used BOOLEAN DEFAULT FALSE, -- COLUNA PARA EVITAR REPETIÇÃO DO TESTE
+  trial_used BOOLEAN DEFAULT FALSE,
   role TEXT DEFAULT 'USER', 
   status TEXT DEFAULT 'ACTIVE',
   total_invested DECIMAL(12,2) DEFAULT 0,
@@ -24,56 +24,10 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Comandos de atualização caso a tabela já exista:
--- ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS plan_activated_at TIMESTAMPTZ DEFAULT NULL;
--- ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS trial_used BOOLEAN DEFAULT FALSE;
-
--- Índices para performance
-CREATE INDEX IF NOT EXISTS idx_profiles_referral_code ON public.profiles(referral_code);
-CREATE INDEX IF NOT EXISTS idx_profiles_referred_by ON public.profiles(referred_by);
-
--- 2. TABELA DE TAREFAS
-CREATE TABLE IF NOT EXISTS public.user_tasks (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-  reward DECIMAL(12,2) DEFAULT 0,
-  plan_id TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- 3. TABELA DE DEPÓSITOS
-CREATE TABLE IF NOT EXISTS public.deposits (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-  user_name TEXT,
-  amount DECIMAL(12,2),
-  hash TEXT,
-  plan_id TEXT,
-  method TEXT DEFAULT 'USDT',
-  status TEXT DEFAULT 'PENDING',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- 4. TABELA DE SAQUES
-CREATE TABLE IF NOT EXISTS public.withdrawals (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-  user_name TEXT,
-  amount DECIMAL(12,2),
-  wallet TEXT,
-  method TEXT DEFAULT 'USDT',
-  fee DECIMAL(12,2) DEFAULT 0,
-  status TEXT DEFAULT 'PENDING',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- 5. HABILITAR RLS
+-- HABILITAR RLS
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_tasks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.deposits ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.withdrawals ENABLE ROW LEVEL SECURITY;
 
--- 6. POLÍTICAS DE SEGURANÇA
+-- POLÍTICAS DE SEGURANÇA
 CREATE OR REPLACE FUNCTION public.is_admin() 
 RETURNS BOOLEAN AS $$
 BEGIN
@@ -84,18 +38,25 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Política de Leitura
 CREATE POLICY "Users can view own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
 CREATE POLICY "Admins can view all profiles" ON public.profiles FOR SELECT USING (public.is_admin());
-CREATE POLICY "Admins can update all profiles" ON public.profiles FOR UPDATE USING (public.is_admin());
-CREATE POLICY "Users can update limited fields" ON public.profiles FOR UPDATE 
+
+-- Política de Atualização (Corrigida para permitir alteração de saldo e spins)
+CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE 
 USING (auth.uid() = id)
 WITH CHECK (
   auth.uid() = id AND (
-    (OLD.balance = NEW.balance) AND 
-    (OLD.role = NEW.role) AND
-    (OLD.referral_code = NEW.referral_code)
+    -- Impede usuários de mudarem seu próprio papel ou código de indicação
+    (NEW.role = OLD.role) AND
+    (NEW.referral_code = OLD.referral_code)
   )
 );
+
+-- Outras tabelas mantêm RLS padrão
+ALTER TABLE public.user_tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.deposits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.withdrawals ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users view own deposits" ON public.deposits FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Admins view all deposits" ON public.deposits FOR SELECT USING (public.is_admin());
