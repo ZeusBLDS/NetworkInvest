@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, DepositRequest, WithdrawRequest } from '../../types';
-import { PLANS } from '../../constants';
+import { PLANS, APP_CONFIG } from '../../constants';
 import { supabase } from '../../supabase';
 
 interface AdminPanelProps {
@@ -11,6 +11,8 @@ interface AdminPanelProps {
   depositWallet: string;
   onUpdateWallet: (w: string) => void;
   onClose: () => void;
+  currency: 'BRL' | 'USDT';
+  onToggleCurrency: () => void;
   onApproveDeposit: (id: string) => void;
   onRejectDeposit: (id: string) => void;
   onApproveWithdraw: (id: string) => void;
@@ -24,6 +26,7 @@ interface AdminPanelProps {
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ 
   users, deposits, withdrawals, depositWallet, onUpdateWallet, onClose, 
+  currency, onToggleCurrency,
   onApproveDeposit, onRejectDeposit, onApproveWithdraw, onRejectWithdraw,
   onUpdateStatus, onDeleteUser, onGivePlan, onAdjustBalance, onUpdateReferrer
 }) => {
@@ -33,7 +36,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [selectedUserNetwork, setSelectedUserNetwork] = useState<string | null>(null);
   const [networkData, setNetworkData] = useState<any>(null);
   
-  // States para troca de senha
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isUpdatingPass, setIsUpdatingPass] = useState(false);
@@ -43,6 +45,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.referralCode?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const formatValue = (val: number) => {
+    if (currency === 'BRL') {
+      const brlValue = val * APP_CONFIG.USDT_BRL_RATE;
+      return brlValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+    return `${val.toFixed(2)} USDT`;
+  };
 
   const fetchUserNetwork = async (user: User) => {
     setSelectedUserNetwork(user.id);
@@ -90,9 +100,23 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center font-black text-slate-900">NI</div>
           <h2 className="text-sm font-black uppercase tracking-tighter italic text-emerald-400">ADMIN CENTER</h2>
         </div>
-        <button onClick={onClose} className="p-2 bg-white/10 rounded-xl hover:bg-white/20 transition-all">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-        </button>
+        
+        <div className="flex items-center space-x-3">
+          <button 
+            onClick={onToggleCurrency}
+            className="bg-white/10 px-3 py-1.5 rounded-xl border border-white/5 flex items-center space-x-2 active:scale-95 transition-all"
+          >
+            <span className={`text-[9px] font-black ${currency === 'BRL' ? 'text-emerald-400' : 'text-slate-400'}`}>BRL</span>
+            <div className="w-6 h-3 bg-white/5 rounded-full relative p-0.5">
+              <div className={`w-2 h-2 bg-emerald-500 rounded-full transition-all duration-300 ${currency === 'USDT' ? 'translate-x-3' : 'translate-x-0'}`}></div>
+            </div>
+            <span className={`text-[9px] font-black ${currency === 'USDT' ? 'text-emerald-400' : 'text-slate-400'}`}>USDT</span>
+          </button>
+          
+          <button onClick={onClose} className="p-2 bg-white/10 rounded-xl hover:bg-white/20 transition-all">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
       </div>
 
       <div className="flex bg-white border-b overflow-x-auto no-scrollbar">
@@ -150,8 +174,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="bg-slate-50 p-3 rounded-2xl text-center border border-slate-100">
-                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Saldo Atual</p>
-                      <p className="text-sm font-black text-emerald-600 italic">{u.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })} USDT</p>
+                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Saldo Atual ({currency})</p>
+                      <p className="text-sm font-black text-emerald-600 italic">{formatValue(u.balance)}</p>
                     </div>
                     <div className="bg-slate-50 p-3 rounded-2xl text-center border border-slate-100">
                       <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Plano Ativo</p>
@@ -160,7 +184,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <button onClick={() => { const val = prompt('Valor para adicionar ou subtrair (+10 ou -10):'); if(val) onAdjustBalance(u.id, parseFloat(val)); }} className="flex-1 bg-slate-900 text-white text-[9px] font-black py-3 rounded-xl uppercase tracking-widest active:scale-95 transition-all">💸 Ajustar Saldo</button>
+                    <button onClick={() => { const val = prompt(`Valor em USDT para adicionar ou subtrair (+10 ou -10):`); if(val) onAdjustBalance(u.id, parseFloat(val)); }} className="flex-1 bg-slate-900 text-white text-[9px] font-black py-3 rounded-xl uppercase tracking-widest active:scale-95 transition-all">💸 Ajustar Saldo</button>
                     <button onClick={() => { const pid = prompt('ID do Plano (vip1, vip2, vip3, vip4):'); if(pid) onGivePlan(u.id, pid); }} className="flex-1 bg-emerald-600 text-white text-[9px] font-black py-3 rounded-xl uppercase tracking-widest active:scale-95 transition-all">💎 Dar VIP</button>
                     <button onClick={() => onUpdateStatus(u.id, u.status === 'ACTIVE' ? 'BLOCKED' : 'ACTIVE')} className="flex-1 bg-amber-500 text-white text-[9px] font-black py-3 rounded-xl uppercase tracking-widest active:scale-95 transition-all">🚫 Bloquear</button>
                     <button onClick={() => fetchUserNetwork(u)} className="flex-1 bg-blue-600 text-white text-[9px] font-black py-4 rounded-xl uppercase tracking-widest active:scale-95 transition-all w-full">🕸️ Ver Rede & Ligar</button>
@@ -289,7 +313,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                             </span>
                           </div>
                         </div>
-                        <p className="text-xl font-black text-emerald-600 italic tracking-tighter">{req.amount.toFixed(2)} USDT</p>
+                        <p className="text-xl font-black text-emerald-600 italic tracking-tighter">{formatValue(req.amount)}</p>
                       </div>
                       <div className="bg-slate-50 p-4 rounded-2xl mb-5 text-[9px] font-mono break-all leading-relaxed border border-slate-100 select-all">
                         <span className="text-slate-400 block mb-1 uppercase font-bold text-[8px]">{req.method === 'PIX' ? 'Comprovante:' : 'Hash Transação:'}</span>
@@ -327,8 +351,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-xl font-black text-amber-600 italic tracking-tighter">{(req.amount - req.fee).toFixed(2)} USDT</p>
-                          <p className="text-[7px] text-slate-300 font-black uppercase tracking-widest">Taxa: {req.fee.toFixed(2)} | Bruto: {req.amount.toFixed(2)}</p>
+                          <p className="text-xl font-black text-amber-600 italic tracking-tighter">{formatValue(req.amount - req.fee)}</p>
+                          <p className="text-[7px] text-slate-300 font-black uppercase tracking-widest">Taxa: {formatValue(req.fee)} | Bruto: {formatValue(req.amount)}</p>
                         </div>
                       </div>
                       <div className="bg-slate-900 p-4 rounded-2xl mb-5 text-emerald-400 text-[9px] font-mono break-all leading-relaxed shadow-inner select-all">
@@ -368,8 +392,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
              </div>
              <div className="bg-slate-900 p-6 rounded-[35px] border shadow-xl flex flex-col items-center text-center text-white">
                 <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-white mb-3">💰</div>
-                <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">Saldo Total</p>
-                <p className="text-xl font-black italic tracking-tighter text-emerald-400">{users.reduce((acc, u) => acc + u.balance, 0).toLocaleString('en-US', { maximumFractionDigits: 0 })} USDT</p>
+                <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">Saldo Total ({currency})</p>
+                <p className={`font-black italic tracking-tighter text-emerald-400 ${currency === 'BRL' ? 'text-lg' : 'text-xl'}`}>
+                  {formatValue(users.reduce((acc, u) => acc + u.balance, 0))}
+                </p>
              </div>
           </div>
         )}

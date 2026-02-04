@@ -332,6 +332,8 @@ const App: React.FC = () => {
           depositWallet={customWallet}
           onUpdateWallet={setCustomWallet}
           onClose={() => setCurrentView(AppView.ACCOUNT)}
+          currency={currency}
+          onToggleCurrency={() => setCurrency(prev => prev === 'BRL' ? 'USDT' : 'BRL')}
           onApproveDeposit={async (id) => {
             const dep = deposits.find(d => d.id === id);
             if (!dep || dep.status !== 'PENDING') return;
