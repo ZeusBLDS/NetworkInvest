@@ -8,9 +8,10 @@ interface PlanListProps {
   myDeposits: DepositRequest[];
   currency: 'BRL' | 'USDT';
   onActivate: (planId: string) => void;
+  onBuyWithBalance?: (planId: string) => void;
 }
 
-const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate, currency }) => {
+const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate, onBuyWithBalance, currency }) => {
   const availablePlans = PLANS.filter(plan => {
     if (plan.id === 'vip_trial') {
       return !user.trialUsed && !user.activePlanId;
@@ -38,6 +39,7 @@ const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate, curre
           const isCurrent = user.activePlanId === plan.id;
           const isPending = myDeposits.some(d => d.planId === plan.id && d.status === 'PENDING');
           const isFree = plan.id === 'vip_trial';
+          const canBuyWithBalance = user.balance >= plan.investment && !isCurrent && !isFree;
 
           return (
             <div key={plan.id} className={`relative bg-white rounded-[40px] p-7 border-2 transition-all duration-500 overflow-hidden ${isCurrent ? 'border-emerald-500 shadow-2xl shadow-emerald-100' : 'border-white shadow-xl shadow-slate-200/50'}`}>
@@ -79,19 +81,30 @@ const PlanList: React.FC<PlanListProps> = ({ user, myDeposits, onActivate, curre
                 </div>
               </div>
 
-              <button
-                disabled={isCurrent || isPending}
-                onClick={() => onActivate(plan.id)}
-                className={`w-full py-5 rounded-[22px] font-black text-[11px] uppercase tracking-[0.2em] transition-all duration-300 ${
-                  isCurrent ? 'bg-slate-50 text-slate-300 cursor-not-allowed border border-slate-200' :
-                  isPending ? 'bg-amber-50 text-amber-600 border border-amber-200 animate-pulse' :
-                  isFree 
-                    ? 'bg-amber-500 text-white shadow-xl shadow-amber-100 active:scale-95' 
-                    : 'bg-emerald-600 text-white shadow-xl shadow-emerald-100 active:scale-95 hover:bg-emerald-700'
-                }`}
-              >
-                {isCurrent ? 'PLANO ATUAL' : isPending ? 'VALIDANDO...' : isFree ? 'ATIVAR TESTE 3 DIAS' : 'ADQUIRIR VIP AGORA'}
-              </button>
+              <div className="flex flex-col gap-3">
+                <button
+                  disabled={isCurrent || isPending}
+                  onClick={() => onActivate(plan.id)}
+                  className={`w-full py-5 rounded-[22px] font-black text-[11px] uppercase tracking-[0.2em] transition-all duration-300 ${
+                    isCurrent ? 'bg-slate-50 text-slate-300 cursor-not-allowed border border-slate-200' :
+                    isPending ? 'bg-amber-50 text-amber-600 border border-amber-200 animate-pulse' :
+                    isFree 
+                      ? 'bg-amber-500 text-white shadow-xl shadow-amber-100 active:scale-95' 
+                      : 'bg-emerald-600 text-white shadow-xl shadow-emerald-100 active:scale-95 hover:bg-emerald-700'
+                  }`}
+                >
+                  {isCurrent ? 'PLANO ATUAL' : isPending ? 'VALIDANDO...' : isFree ? 'ATIVAR TESTE 3 DIAS' : 'ADQUIRIR VIA PIX / USDT'}
+                </button>
+
+                {canBuyWithBalance && onBuyWithBalance && (
+                  <button
+                    onClick={() => onBuyWithBalance(plan.id)}
+                    className="w-full py-4 rounded-[22px] font-black text-[10px] uppercase tracking-widest border-2 border-emerald-500 text-emerald-600 bg-white hover:bg-emerald-50 transition-all active:scale-95"
+                  >
+                    ATIVAR COM SALDO DA CONTA ⚡
+                  </button>
+                )}
+              </div>
             </div>
           );
         })}

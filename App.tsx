@@ -207,40 +207,40 @@ const App: React.FC = () => {
     }
   };
 
-  const performCheckIn = async () => {
+  const handleBuyWithBalance = async (planId: string) => {
     if (!currentUser) return;
-    const earningToday = 0.01;
-    const today = new Date().toISOString();
-    try {
-      const { data } = await supabase.from('profiles').update({
-        balance: currentUser.balance + earningToday,
-        last_check_in: today,
-        check_in_streak: currentUser.checkInStreak + 1
-      }).eq('id', currentUser.id).select().single();
-      
-      if (data) {
-        const updated = mapUserFromDB(data);
-        setCurrentUser(updated);
-        return updated.checkInStreak;
+    const plan = PLANS.find(p => p.id === planId);
+    if (!plan) return;
+
+    if (currentUser.balance < plan.investment) {
+      alert('Saldo insuficiente na plataforma.');
+      return;
+    }
+
+    if (window.confirm(`Deseja ativar o ${plan.name} usando R$ ${(plan.investment * APP_CONFIG.USDT_BRL_RATE).toFixed(2)} do seu saldo disponível?`)) {
+      try {
+        const now = new Date().toISOString();
+        const newBalance = currentUser.balance - plan.investment;
+        
+        const { error } = await supabase.from('profiles').update({ 
+          balance: newBalance,
+          active_plan_id: planId,
+          plan_activated_at: now
+        }).eq('id', currentUser.id);
+
+        if (error) throw error;
+
+        await distributeCommissions(currentUser.id, plan.investment);
+        alert('🎯 Plano ativado com sucesso usando seu saldo!');
+        fetchUserProfile(currentUser.id);
+      } catch (e) {
+        alert('Erro ao processar compra com saldo.');
       }
-    } catch (e) {
-      console.error("Checkin error:", e);
     }
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setCurrentUser(null);
-    setCurrentView(AppView.LOGIN);
-    sessionStorage.removeItem('ni_notice_seen');
-    sessionStorage.removeItem('ni_test_offered');
-  };
-
-  const handleDepositConfirm = async (hash: string, method: 'USDT' | 'PIX') => {
+  const handleDepositConfirm = async (hash: string, method: 'USDT' | 'PIX', amount: number) => {
     if (!currentUser) return;
-    const amount = pendingPlanId ? PLANS.find(p => p.id === pendingPlanId)?.investment || 0 : 0;
-    const now = new Date().toISOString();
-    
     try {
       await supabase.from('deposits').insert({
         user_id: currentUser.id,
@@ -248,31 +248,21 @@ const App: React.FC = () => {
         amount: amount,
         hash: hash,
         plan_id: pendingPlanId,
-        status: 'APPROVED', 
+        status: 'PENDING',
         method: method
       });
 
       if (pendingPlanId) {
-        await supabase.from('profiles').update({ 
-          active_plan_id: pendingPlanId,
-          plan_activated_at: now 
-        }).eq('id', currentUser.id);
-        if (amount > 0) {
-          await distributeCommissions(currentUser.id, amount);
-        }
-        alert('🎯 ATIVAÇÃO CONCLUÍDA! Seu plano já está operando.');
+        alert('🎯 PEDIDO DE PLANO ENVIADO! Aguarde a aprovação.');
       } else {
-        await updateBalance(amount);
-        alert('💰 SALDO CREDITADO! Sua conta foi atualizada.');
+        alert('💰 PEDIDO DE DEPÓSITO ENVIADO! O saldo será creditado após validação.');
       }
       
       setShowDeposit(false);
       setPendingPlanId(null);
       fetchUserProfile(currentUser.id);
     } catch (err) {
-      console.error("Erro na ativação automática:", err);
-      alert("Houve um erro na ativação automática. Nossa equipe revisará manualmente.");
-      setShowDeposit(false);
+      alert("Erro ao notificar depósito.");
     }
   };
 
@@ -295,7 +285,6 @@ const App: React.FC = () => {
   const handleWithdrawSubmit = async (amount: number, wallet: string, method: 'USDT' | 'PIX') => {
     if (!currentUser) return;
     const fee = method === 'PIX' ? amount * 0.10 : 0;
-    
     await supabase.from('withdrawals').insert({
       user_id: currentUser.id,
       user_name: currentUser.name,
@@ -305,7 +294,6 @@ const App: React.FC = () => {
       status: 'PENDING',
       method: method
     });
-
     await updateBalance(-amount);
     setShowWithdraw(false);
     alert('Solicitação de saque enviada!');
@@ -315,6 +303,15 @@ const App: React.FC = () => {
     await updateBalance(amount);
     if (currentUser) {
       fetchUserProfile(currentUser.id);
+    }
+  };
+
+  // Fix the 'Cannot find name handleLogout' error by defining the missing function.
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error("Erro logout:", e);
     }
   };
 
@@ -343,10 +340,7 @@ const App: React.FC = () => {
             const now = new Date().toISOString();
             await supabase.from('deposits').update({ status: 'APPROVED' }).eq('id', id);
             if (dep.planId) {
-              await supabase.from('profiles').update({ 
-                active_plan_id: dep.planId,
-                plan_activated_at: now
-              }).eq('id', dep.userId);
+              await supabase.from('profiles').update({ active_plan_id: dep.planId, plan_activated_at: now }).eq('id', dep.userId);
               await distributeCommissions(dep.userId, dep.amount);
             } else {
               await updateBalance(dep.amount, dep.userId);
@@ -382,10 +376,7 @@ const App: React.FC = () => {
           }}
           onGivePlan={async (uid, pid) => {
             const now = new Date().toISOString();
-            await supabase.from('profiles').update({ 
-              active_plan_id: pid,
-              plan_activated_at: now
-            }).eq('id', uid);
+            await supabase.from('profiles').update({ active_plan_id: pid, plan_activated_at: now }).eq('id', uid);
             fetchAdminData();
           }}
           onAdjustBalance={async (uid, amt) => {
@@ -409,7 +400,18 @@ const App: React.FC = () => {
             user={currentUser} 
             myDeposits={myDeposits} 
             updateBalance={updateBalance} 
-            performCheckIn={performCheckIn}
+            performCheckIn={async () => {
+              const res = await supabase.from('profiles').update({
+                balance: currentUser.balance + 0.01,
+                last_check_in: new Date().toISOString(),
+                check_in_streak: currentUser.checkInStreak + 1
+              }).eq('id', currentUser.id).select().single();
+              if (res.data) {
+                const updated = mapUserFromDB(res.data);
+                setCurrentUser(updated);
+                return updated.checkInStreak;
+              }
+            }}
             currency={currency}
             onToggleCurrency={() => setCurrency(prev => prev === 'BRL' ? 'USDT' : 'BRL')}
             addNotification={() => {}} 
@@ -432,14 +434,10 @@ const App: React.FC = () => {
             myDeposits={myDeposits} 
             currency={currency}
             onActivate={(pid) => { 
-              if (pid === 'vip_trial') {
-                handleActivateTrial(); 
-              } else if (pid === 'vip0') {
-                handleActivateTrial(); 
-              } else {
-                setPendingPlanId(pid); setShowDeposit(true); 
-              }
+              if (pid === 'vip_trial') handleActivateTrial(); 
+              else { setPendingPlanId(pid); setShowDeposit(true); }
             }} 
+            onBuyWithBalance={handleBuyWithBalance}
           />
         )}
         {currentView === AppView.NETWORK && <NetworkView user={currentUser} currency={currency} />}
@@ -461,18 +459,9 @@ const App: React.FC = () => {
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen shadow-2xl relative overflow-x-hidden">
       {renderContent()}
-      
       {showWelcome && <WelcomeModal onClose={() => { setShowWelcome(false); if(!currentUser?.trialUsed) setShowVipZero(true); }} />}
       {showVipZero && <VipZeroModal onActivate={handleActivateTrial} />}
-      
-      {showOfficialNotice && (
-        <OfficialNoticeModal 
-          onClose={() => { 
-            setShowOfficialNotice(false); 
-            sessionStorage.setItem('ni_notice_seen', 'true'); 
-          }} 
-        />
-      )}
+      {showOfficialNotice && <OfficialNoticeModal onClose={() => { setShowOfficialNotice(false); sessionStorage.setItem('ni_notice_seen', 'true'); }} />}
       {showWithdraw && <WithdrawModal user={currentUser!} currency={currency} onClose={() => setShowWithdraw(false)} onSubmit={handleWithdrawSubmit} />}
       {showDeposit && (
         <DepositModal 
@@ -480,7 +469,7 @@ const App: React.FC = () => {
           userCode={currentUser!.referralCode}
           onClose={() => setShowDeposit(false)} 
           onConfirm={handleDepositConfirm} 
-          prefilledAmount={pendingPlanId ? PLANS.find(p => p.id === pendingPlanId)?.investment.toString() : ''}
+          prefilledAmount={pendingPlanId ? PLANS.find(p => p.id === pendingPlanId)?.investment.toFixed(2) : ''}
         />
       )}
       {showWheel && <LuckyWheelModal user={currentUser!} onClose={() => setShowWheel(false)} onWin={handleWinWheel} />}

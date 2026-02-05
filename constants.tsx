@@ -5,9 +5,9 @@ export const PLANS: Plan[] = [
   {
     id: 'vip_trial',
     name: 'VIP EXPERIÊNCIA',
-    investment: 0.00,
-    dailyReturn: 0.30,
-    dailyPercent: 0,
+    investment: 2.666667, // R$ 16.00 / 6
+    dailyReturn: 0.30,    // R$ 1.80 / 6
+    dailyPercent: 11.25,
     durationDays: 3,
     totalReturn: 0.90,
     tasksPerDay: 1
@@ -15,41 +15,41 @@ export const PLANS: Plan[] = [
   {
     id: 'vip1',
     name: 'VIP 1',
-    investment: 3.00,
-    dailyReturn: 0.30,
-    dailyPercent: 10,
+    investment: 20.00,    // R$ 120.00 / 6
+    dailyReturn: 1.25,    // R$ 7.50 / 6
+    dailyPercent: 6.25,
     durationDays: 90,
-    totalReturn: 27.00,
+    totalReturn: 112.50,
     tasksPerDay: 1
   },
   {
     id: 'vip2',
     name: 'VIP 2',
-    investment: 20.00,
-    dailyReturn: 1.60,
-    dailyPercent: 8,
+    investment: 50.00,    // R$ 300.00 / 6
+    dailyReturn: 2.00,    // R$ 12.00 / 6
+    dailyPercent: 4.00,
     durationDays: 90,
-    totalReturn: 144.00,
+    totalReturn: 180.00,
     tasksPerDay: 1
   },
   {
     id: 'vip3',
     name: 'VIP 3',
-    investment: 50.00,
-    dailyReturn: 3.50,
-    dailyPercent: 7,
+    investment: 100.00,   // R$ 600.00 / 6
+    dailyReturn: 2.50,    // R$ 15.00 / 6
+    dailyPercent: 2.50,
     durationDays: 90,
-    totalReturn: 315.00,
+    totalReturn: 225.00,
     tasksPerDay: 1
   },
   {
     id: 'vip4',
     name: 'VIP 4',
-    investment: 80.00,
-    dailyReturn: 16.00,
-    dailyPercent: 20,
+    investment: 150.00,   // R$ 900.00 / 6
+    dailyReturn: 5.00,    // R$ 30.00 / 6
+    dailyPercent: 3.33,
     durationDays: 90,
-    totalReturn: 1440.00,
+    totalReturn: 450.00,
     tasksPerDay: 1
   }
 ];
